@@ -1,0 +1,83 @@
+---
+title: "HH-AgeCombine"
+author: "Mark Ruddy"
+date: "21 July 2016"
+output: html_document
+---
+
+```{r Libraries}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+```
+
+## Tasks
+
+Combine variables - so that we don't have separate ones for 2 person and other households.
+
+So, create:
+* HH_16_24 + HH_2_16_24 -> HH_16_24_comb
+* HH_25_44 + HH_2_25_44 -> HH_25_44_comb
+* HH_45_64 + HH_2_45_64 -> HH_45_64_comb
+* HH_65plus + HH_2_65plus -> HH_65plus_comb
+
+### Check for conflicts between pairs
+
+
+```{r Create combined variables}
+# * HH_16_24 & HH_2_16_24 -> HH_16_24_comb
+# * HH_25_44 & HH_2_25_44 -> HH_25_44_comb
+# * HH_45_64 & HH_2_45_64 -> HH_45_64_comb
+# * HH_65plus & HH_2_65plus -> HH_65plus_comb
+ppv.tmp <- ppv
+
+## Including check that both variables in a pair don't have a value.         
+ppv.tmp <- ppv.tmp %>% 
+  mutate(HH_16_24_comb = ifelse(is.na(HH_16_24) & is.na(HH_2_16_24), NA,
+                                ifelse(is.na(HH_16_24) & !is.na(HH_2_16_24), HH_2_16_24,
+                                       ifelse(!is.na(HH_16_24) & is.na(HH_2_16_24), HH_16_24, 
+                                              ifelse(!is.na(HH_16_24) & !is.na(HH_2_16_24), HH_16_24 + HH_2_16_24, NA))))) %>%
+  
+  mutate(HH_25_44_comb = ifelse(is.na(HH_25_44) & is.na(HH_2_25_44), NA,
+                                ifelse(is.na(HH_25_44) & !is.na(HH_2_25_44), HH_2_25_44,
+                                       ifelse(!is.na(HH_25_44) & is.na(HH_2_25_44), HH_25_44, 
+                                              ifelse(!is.na(HH_25_44) & !is.na(HH_2_25_44), HH_25_44 + HH_2_25_44, NA))))) %>%
+  
+  mutate(HH_45_64_comb = ifelse(is.na(HH_45_64) & is.na(HH_2_45_64), NA,
+                                ifelse(is.na(HH_45_64) & !is.na(HH_2_45_64), HH_2_45_64,
+                                       ifelse(!is.na(HH_45_64) & is.na(HH_2_45_64), HH_45_64, 
+                                              ifelse(!is.na(HH_45_64) & !is.na(HH_2_45_64), HH_45_64 + HH_2_45_64, NA))))) %>%
+    
+  mutate(HH_65plus_comb = ifelse(is.na(HH_65plus) & is.na(HH_2_65plus), NA,
+                                ifelse(is.na(HH_65plus) & !is.na(HH_2_65plus), HH_2_65plus,
+                                       ifelse(!is.na(HH_65plus) & is.na(HH_2_65plus), HH_65plus, 
+                                              ifelse(!is.na(HH_65plus) & !is.na(HH_2_65plus), HH_65plus + HH_2_65plus, NA))))) 
+
+## Check
+ppv.tmp %>%
+  select(ID, Household, HH_number, HH_16_24, HH_2_16_24, HH_16_24_comb, HH_25_44, HH_2_25_44, HH_25_44_comb, HH_45_64, HH_2_45_64, HH_45_64_comb, HH_65plus, HH_2_65plus, HH_65plus_comb) %>%
+  View()
+## OK
+
+## Set updated df
+ppv <- ppv.tmp
+
+## Clean up
+rm(ppv.tmp)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

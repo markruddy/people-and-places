@@ -1,0 +1,58 @@
+---
+title: "Export dataset to SPSS"
+author: "Mark Ruddy"
+date: "29 July 2016"
+output: html_document
+---
+
+Load packages and set working directory
+```{r Setup, include=TRUE}
+#library(foreign) don't use - doesn't export with this dataset.
+library(openxlsx)
+library(dplyr)
+setwd("/Users/markruddy/Documents/Personal/Work/DataScience/PeopleAndPlaces/")
+```
+
+Export
+```{r Export dataset SPSS, include=FALSE}
+write.foreign(ppv, "./Working/Outputs/DataExports/pp_data_20160729.txt", "./Working/Outputs/DataExports/pp_data_20160729.sps", package = "SPSS")
+
+## Results in following error
+# > write.foreign(ppv, "./Working/Outputs/DataExports/pp_data_20160729.txt", "./Working/Outputs/DataExports/pp_data_20160729.sps", package = "SPSS")
+# Error in writeForeignSPSS(df = list(Startedsurvey = c(1463135737, 1463142093,  : 
+#   I cannot abbreviate the variable names to eight or fewer letters
+```
+This is not successful. write.foreign limits variable names to 8 characters as this is a limit from an old SPSS version.
+
+
+Export to csv.
+```{r Export to csv}
+
+write.table(ppv, "./Working/Outputs/DataExports/pp_data_20160729.csv", sep="\t", row.names = FALSE)
+
+```
+This works but I am unable to open in OpenOffice to check the import and resave as .xls.
+
+
+Export to Excel.
+Using openxlsx.
+```{r Export to Excel}
+## Convert to data.frame
+ppv.df <- as.data.frame(ppv)
+
+write.xlsx(ppv.df, "./Working/Outputs/DataExports/pp_data_20160807.xlsx", colNames=TRUE, rowNames=FALSE)
+
+## Check export
+ppv.tmp <- ppv
+
+ppv.tmp %>%
+  filter(ID==10) %>%
+  select(.[[1]])
+
+rm(ppv.df)
+```
+
+
+
+
+

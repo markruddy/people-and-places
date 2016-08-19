@@ -1,0 +1,44 @@
+---
+title: "Check 'refused' entries"
+author: "Mark Ruddy"
+date: "14 July 2016"
+output: html_document
+---
+
+```{r Load packages}
+library(dplyr)
+library(tidyr)
+library(stringr)
+```
+
+## Task
+
+Check diary variables Cycleweek:MinsCar, Household:Car7min for data entered. Particularly coded as 'Refused to answer'.
+
+```{r All relevant entries}
+
+unite <- pp %>% 
+  select(c(Cycleweek:MinsCar, Household:Car7min)) %>%
+  gather(Variable, Entry)
+
+dis <- unite %>%
+  group_by(Variable) %>%
+  distinct(Entry) %>%
+  mutate(label = row_number(Variable))
+
+wide <- spread(dis, Variable, Entry)
+
+rm(unite, dis)
+
+```
+
+There are no 'refused to answer' coded values in any of these variables.
+
+
+```{r Clean up}
+rm(unite, dis, wide)
+```
+
+
+
+

@@ -1,0 +1,228 @@
+---
+title: "Cycling area"
+author: "Mark Ruddy"
+date: "29 July 2016"
+output: html_document
+---
+
+Load libraries and data
+```{r Setup, include=FALSE}
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(knitr)
+library(ggplot2)
+# setwd("/Users/markruddy/Documents/Personal/Work/DataScience/PeopleAndPlaces/")
+# load("./Data/pp.data.RData")
+```
+
+## Tasks
+
+Create new variables combining agree and strongly agree; disagree and strongly disagree for variables:
+*Area_cyc_unsafe*, *Area_cross*, *Area_talk*, *Area_8yo_walk*, *Area_stop*, *Area_crime*, *Area_cyc_path*, *Area_walk_pleas*, *Area_shade*, *Area_airpoll*, *Area_cyc_pleas*, *Area_8yo_cyc*, *Area_facilities*, *Area_walk_unsafe*, *Area_pavements*.
+
+The values coding for these options are as follows:
+
+Combine disagree and strongly disagree into 'Disagree'
+'Tend to Disagree'=2
+'Strongly Disagree'=1
+
+Combine agree and strongly agree into 'Agree'
+'Tend to Agree'=3
+'Strongly Agree'=4
+
+These values will be combined into a single new variable created for each of survey questions we are interested in (listed above).
+
+In the new variable 'Disagree'=1 and 'Agree'=2.
+```{r }
+## Test data
+ppv.tmp <- ppv
+
+## Area_cyc_unsafe
+ppv.tmp2 <- ppv.tmp %>%
+  mutate(Area_cyc_unsafe_AgDis = ifelse(Area_cyc_unsafe==1 | Area_cyc_unsafe==2, 1, NA)) %>%
+  mutate(Area_cyc_unsafe_AgDis = ifelse(is.na(Area_cyc_unsafe_AgDis), ifelse(Area_cyc_unsafe==3 | Area_cyc_unsafe==4, 2, Area_cyc_unsafe_AgDis), Area_cyc_unsafe_AgDis)) 
+# %>%
+#   select(ID, Area_cyc_unsafe, Area_cyc_unsafe_AgDis) %>%
+#   sample_n(400) %>%
+#   View()
+
+## Area_cross
+ppv.tmp2 <- ppv.tmp2 %>%
+  mutate(Area_cross_AgDis = ifelse(Area_cross==1 | Area_cross==2, 1, NA)) %>%
+  mutate(Area_cross_AgDis = ifelse(is.na(Area_cross_AgDis), ifelse(Area_cross==3 | Area_cross==4, 2, Area_cross_AgDis), Area_cross_AgDis)) 
+# %>%
+#   select(ID, Area_cross, Area_cross_AgDis) %>%
+#   sample_n(400) %>%
+#   View()
+
+
+## Area_talk
+ppv.tmp2 <- ppv.tmp2 %>%
+  mutate(Area_talk_AgDis = ifelse(Area_talk==1 | Area_talk==2, 1, NA)) %>%
+  mutate(Area_talk_AgDis = ifelse(is.na(Area_talk_AgDis), ifelse(Area_talk==3 | Area_talk==4, 2, Area_talk_AgDis), Area_talk_AgDis)) 
+# %>%
+# select(ID, Area_talk, Area_talk_AgDis) %>%
+#   sample_n(400) %>%
+#   View()
+
+
+## Area_8yo_walk
+ppv.tmp2 <- ppv.tmp2 %>%
+  mutate(Area_8yo_walk_AgDis = ifelse(Area_8yo_walk==1 | Area_8yo_walk==2, 1, NA)) %>%
+  mutate(Area_8yo_walk_AgDis = ifelse(is.na(Area_8yo_walk_AgDis), ifelse(Area_8yo_walk==3 | Area_8yo_walk==4, 2, Area_8yo_walk_AgDis), Area_8yo_walk_AgDis)) 
+# %>%
+#   select(ID, Area_8yo_walk, Area_8yo_walk_AgDis) %>%
+#   sample_n(400) %>%
+#   View()
+
+
+## Area_stop
+ppv.tmp2 <- ppv.tmp2 %>%
+  mutate(Area_stop_AgDis = ifelse(Area_stop==1 | Area_stop==2, 1, NA)) %>%
+  mutate(Area_stop_AgDis = ifelse(is.na(Area_stop_AgDis), ifelse(Area_stop==3 | Area_stop==4, 2, Area_stop_AgDis), Area_stop_AgDis)) 
+# %>%
+#   select(ID, Area_stop, Area_stop_AgDis) %>%
+#   sample_n(400) %>%
+#   View()
+
+
+## Area_crime
+ppv.tmp2 <- ppv.tmp2 %>%
+  mutate(Area_crime_AgDis = ifelse(Area_crime==1 | Area_crime==2, 1, NA)) %>%
+  mutate(Area_crime_AgDis = ifelse(is.na(Area_crime_AgDis), ifelse(Area_crime==3 | Area_crime==4, 2, Area_crime_AgDis), Area_crime_AgDis)) 
+# %>%
+#   select(ID, Area_crime, Area_crime_AgDis) %>%
+#   sample_n(400) %>%
+#   View()
+
+
+## Area_cyc_path
+ppv.tmp2 <- ppv.tmp2 %>%
+  mutate(Area_cyc_path_AgDis = ifelse(Area_cyc_path==1 | Area_cyc_path==2, 1, NA)) %>%
+  mutate(Area_cyc_path_AgDis = ifelse(is.na(Area_cyc_path_AgDis), ifelse(Area_cyc_path==3 | Area_cyc_path==4, 2, Area_cyc_path_AgDis), Area_cyc_path_AgDis)) 
+# %>%
+#   select(ID, Area_cyc_path, Area_cyc_path_AgDis) %>%
+#   sample_n(400) %>%
+#   View()
+
+
+## Area_walk_pleas
+ppv.tmp2 <- ppv.tmp2 %>%
+  mutate(Area_walk_pleas_AgDis = ifelse(Area_walk_pleas==1 | Area_walk_pleas==2, 1, NA)) %>%
+  mutate(Area_walk_pleas_AgDis = ifelse(is.na(Area_walk_pleas_AgDis), ifelse(Area_walk_pleas==3 | Area_walk_pleas==4, 2, Area_walk_pleas_AgDis), Area_walk_pleas_AgDis)) 
+# %>%
+#   select(ID, Area_walk_pleas, Area_walk_pleas_AgDis) %>%
+#   sample_n(400) %>%
+#   View()
+
+
+## Area_shade
+ppv.tmp2 <- ppv.tmp2 %>%
+  mutate(Area_shade_AgDis = ifelse(Area_shade==1 | Area_shade==2, 1, NA)) %>%
+  mutate(Area_shade_AgDis = ifelse(is.na(Area_shade_AgDis), ifelse(Area_shade==3 | Area_shade==4, 2, Area_shade_AgDis), Area_shade_AgDis)) 
+# %>%
+#   select(ID, Area_shade, Area_shade_AgDis) %>%
+#   sample_n(400) %>%
+#   View()
+# 
+
+
+## Area_airpoll
+ppv.tmp2 <- ppv.tmp2 %>%
+  mutate(Area_airpoll_AgDis = ifelse(Area_airpoll==1 | Area_airpoll==2, 1, NA)) %>%
+  mutate(Area_airpoll_AgDis = ifelse(is.na(Area_airpoll_AgDis), ifelse(Area_airpoll==3 | Area_airpoll==4, 2, Area_airpoll_AgDis), Area_airpoll_AgDis)) 
+# %>%
+#   select(ID, Area_airpoll, Area_airpoll_AgDis) %>%
+#   sample_n(400) %>%
+#   View()
+
+
+## Area_cyc_pleas
+ppv.tmp2 <- ppv.tmp2 %>%
+  mutate(Area_cyc_pleas_AgDis = ifelse(Area_cyc_pleas==1 | Area_cyc_pleas==2, 1, NA)) %>%
+  mutate(Area_cyc_pleas_AgDis = ifelse(is.na(Area_cyc_pleas_AgDis), ifelse(Area_cyc_pleas==3 | Area_cyc_pleas==4, 2, Area_cyc_pleas_AgDis), Area_cyc_pleas_AgDis)) 
+# %>%
+#   select(ID, Area_cyc_pleas, Area_cyc_pleas_AgDis) %>%
+#   sample_n(400) %>%
+#   View()
+
+
+## Area_8yo_cyc
+ppv.tmp2 <- ppv.tmp2 %>%
+  mutate(Area_8yo_cyc_AgDis = ifelse(Area_8yo_cyc==1 | Area_8yo_cyc==2, 1, NA)) %>%
+  mutate(Area_8yo_cyc_AgDis = ifelse(is.na(Area_8yo_cyc_AgDis), ifelse(Area_8yo_cyc==3 | Area_8yo_cyc==4, 2, Area_8yo_cyc_AgDis), Area_8yo_cyc_AgDis)) 
+# %>%
+#   select(ID, Area_8yo_cyc, Area_8yo_cyc_AgDis) %>%
+#   sample_n(400) %>%
+#   View()
+
+
+## Area_facilities
+ppv.tmp2 <- ppv.tmp2 %>%
+  mutate(Area_facilities_AgDis = ifelse(Area_facilities==1 | Area_facilities==2, 1, NA)) %>%
+  mutate(Area_facilities_AgDis = ifelse(is.na(Area_facilities_AgDis), ifelse(Area_facilities==3 | Area_facilities==4, 2, Area_facilities_AgDis), Area_facilities_AgDis)) 
+# %>%
+#   select(ID, Area_facilities, Area_facilities_AgDis) %>%
+#   sample_n(400) %>%
+#   View()
+# 
+
+
+## Area_walk_unsafe
+ppv.tmp2 <- ppv.tmp2 %>%
+  mutate(Area_walk_unsafe_AgDis = ifelse(Area_walk_unsafe==1 | Area_walk_unsafe==2, 1, NA)) %>%
+  mutate(Area_walk_unsafe_AgDis = ifelse(is.na(Area_walk_unsafe_AgDis), ifelse(Area_walk_unsafe==3 | Area_walk_unsafe==4, 2, Area_walk_unsafe_AgDis), Area_walk_unsafe_AgDis)) 
+# %>%
+#   select(ID, Area_walk_unsafe, Area_walk_unsafe_AgDis) %>%
+#   sample_n(400) %>%
+#   View()
+
+
+## Area_pavements
+ppv.tmp2 <- ppv.tmp2 %>%
+  mutate(Area_pavements_AgDis = ifelse(Area_pavements==1 | Area_pavements==2, 1, NA)) %>%
+  mutate(Area_pavements_AgDis = ifelse(is.na(Area_pavements_AgDis), ifelse(Area_pavements==3 | Area_pavements==4, 2, Area_pavements_AgDis), Area_pavements_AgDis)) 
+# %>%
+#   select(ID, Area_pavements, Area_pavements_AgDis) %>%
+#   sample_n(400) %>%
+#   View()
+
+```
+
+```{r Check new variables}
+ppv.tmp2 %>%
+  glimpse()
+
+## Set
+ppv <- ppv.tmp2
+
+## Clean up
+rm(ppv.tmp, ppv.tmp2)
+```
+
+
+
+```{r Function for variable generation, include=F, eval=F}
+## Explore function for this at later stage
+ppv.AgDis <- ppv.tmp %>%
+  select(ID, starts_with("Area"), -Areacomments)
+
+
+mut_AgDis <- function(DF) {
+  require(dplyr)
+  for (i in 2:ncol(DF)) { 
+    paste0(DF[i],"_AgDis")
+  }
+
+}
+
+mut_AgDis(ppv.AgDis)
+```
+
+
+
+
+
+
+

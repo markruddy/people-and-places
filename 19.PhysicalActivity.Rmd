@@ -1,0 +1,168 @@
+---
+title: "Phyact7days checks"
+author: "Mark Ruddy"
+date: "30 July 2016"
+output: html_document
+---
+
+
+Load libraries and data
+```{r Setup, include=FALSE}
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(knitr)
+library(ggplot2)
+# setwd("/Users/markruddy/Documents/Personal/Work/DataScience/PeopleAndPlaces/")
+# load("./Data/pp.data.RData")
+```
+
+## Task
+
+Sense check against number of days walking and/or cycling.
+
+Survey question asks:
+
+> In the past week (seven days), on how many days have you done a total of 30 minutes or more of physical activity, which was enough to raise your breathing rate?
+> This may include sport, exercise and brisk walking or cycling for recreation or to get to and from places, but should not include housework or physical activity that may be part of your job.
+
+1. Cross check with number of days cycling/walking.
+
+```{r Scope variable, include=FALSE}
+## Test data
+ppv.tmp <- ppv
+
+ppv.tmp %>%
+  select(ID, Phyact7days) %>%
+  arrange(desc(Phyact7days)) %>%
+  View()
+
+## Phyact7days is a character variable. Convert to numeric but test first.
+ppv.tmp2 <- ppv.tmp %>%
+  mutate(Phyact7days_num = as.numeric(Phyact7days))
+
+Phyact7days.orig <- ppv.tmp %>%
+  select(ID, Phyact7days)
+
+ppv.tmp2 %>%
+  select(ID, Phyact7days_num) %>%
+  right_join(Phyact7days.orig, "ID") %>%
+  View()
+## All match other than ID 49 but coercion to NA not a problem.
+
+## Clean up
+rm(Phyact7days.orig, ppv.tmp2, ppv.tmp)
+```
+The Phyact7days entry for ID 49 was entered as 'ref' (presumably refused). This has been changed to NA in converting Phyact7days to numeric.
+
+```{r Convert Phyact7days to numeric}
+## Temp data
+ppv.tmp <- ppv
+
+ppv.tmp <- ppv.tmp %>%
+  mutate(Phyact7days = as.numeric(Phyact7days))
+
+ppv.tmp %>%
+  select(ID, Phyact7days) %>%
+  View()
+
+ppv <- ppv.tmp
+
+## Clean up
+rm(ppv.tmp)
+```
+
+Now compare Phyact7days with active mode Diary entries (walking and cycling).
+```{r Compare Phyact7days with active Diary entries}
+## Temp data
+ppv.tmp <- ppv
+
+## Compare walking and cycling (active) Diary entries with Phyact7days
+## Create variable splitting Phyact7days vs active diary into:
+## "Phyact < diary"
+## "Phyact > diary"
+
+ppv.tmp %>%
+  select(ID, Phyact7days, Active_days) %>%
+  mutate(Phyact_qry = ifelse(Phyact7days<Active_days, "Phyact < diary", NA)) %>%
+  mutate(Phyact_qry = ifelse(is.na(Phyact_qry), ifelse(Phyact7days>Active_days, "Phyact > diary", Phyact_qry), Phyact_qry)) %>%
+  # filter(Phyact_qry==2) %>%
+  # arrange(desc(Phyact7days), desc(Active_days)) %>%
+  # View()
+  # arrange(desc(Phyact7days)) %>%
+  na.omit(count) %>%
+  group_by(Phyact_qry) %>%
+  summarise(count=n()) %>%
+  kable(title="Counts of Phyact7days compared with Active_days", col.names=c("Phyact7days v Active Diary","count"))
+```
+There are 3342 disagreements.
+2421 responses where Phyact7days are less than diary active days.
+921 responses where Phyact7days are greater than diary active days.
+
+
+Create variable flagging these differences.
+```{r Create variable Phyact7days with active Diary entries}
+## 1="Phyact < diary"
+## 2="Phyact > diary"
+## Query differences into new variable
+phyact.diary <- ppv.tmp %>%
+  select(ID, Phyact7days, Active_days) %>%
+  mutate(Phyact_qry = ifelse(Active_days!=Phyact7days,1,NA)) %>%
+  mutate(Phyact_qry = ifelse(Phyact7days<Active_days, 1, NA)) %>%
+  mutate(Phyact_qry = ifelse(is.na(Phyact_qry), ifelse(Phyact7days>Active_days, 2, Phyact_qry), Phyact_qry)) %>%
+  select(ID, Phyact_qry) 
+
+## Join new variable
+ppv.tmp2 <- phyact.diary %>%
+  right_join(ppv.tmp, ., "ID") 
+# %>%
+#   select(ID, Phyact7days, Active_days, Phyact_qry)
+
+## Check
+glimpse(ppv.tmp2)
+## OK
+
+## Set changes
+ppv <- ppv.tmp2
+
+## Clean up
+rm(ppv.tmp2, ppv.tmp, phyact.diary)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

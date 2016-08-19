@@ -1,0 +1,75 @@
+---
+title: "Check 'refused' entries"
+author: "Mark Ruddy"
+date: "14 July 2016"
+output: html_document
+---
+
+```{r Load packages}
+library(dplyr)
+library(tidyr)
+library(stringr)
+```
+
+## Check Household
+
+```{r Examine Household}
+## List distinct Household values
+ppv %>%
+  select(Household) %>%
+  distinct(Household)
+```
+There are no 'refused to answer' (option 8) responses. Confirming Codebook summary of dataset.
+
+
+## Check diary variables for data entered.
+
+```{r Diary?... all entries}
+unite <- pp %>% 
+  select(Diary1walk:Diary7ref) %>%
+  gather(DiaryDay, Entry)
+
+dis <- unite %>%
+  group_by(DiaryDay) %>%
+  distinct(Entry) %>%
+  mutate(label = row_number(DiaryDay))
+
+wide <- spread(dis, DiaryDay, Entry)
+
+rm(unite, dis)
+```
+There are only NA, 0, 1 entries in Diary... variables.
+
+```{r Clean up}
+rm(wide)
+```
+
+
+## Check time spent doing active travel variables for data entered.
+
+```{r Active travel time all entries}
+ppv.tmp <- ppv
+
+unite <- ppv %>%
+  select(ID, Walk1min:Car7min) %>%
+  gather(ModeDay, Entry, -ID)
+
+dis <- unite %>%
+  group_by(ModeDay) %>%
+  distinct(Entry) #%>%
+  #mutate(label = row_number(ModeDay))
+
+wide <- spread(dis, ModeDay, Entry)
+
+rm(unite, dis, ppv.tmp)
+```
+There are only NA, 0, 1 entries in time performing active travel variables.
+
+
+```{r Clean up}
+rm(wide)
+```
+
+
+
+

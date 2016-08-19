@@ -1,0 +1,131 @@
+---
+title: "Minutes activity sense check"
+author: "Mark Ruddy"
+date: "13 July 2016"
+output: html_document
+---
+
+```{r Load packages}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+```
+
+## Check of minutes activity
+
+Check NAs
+```{r NAs in Mins...}
+## MinsCycling
+ppv %>%
+  filter(!is.na(MinsCycling)) %>%
+  tally()
+
+## MinsWalking
+ppv %>%
+  filter(!is.na(MinsWalking)) %>%
+  tally()
+
+## MinsCar
+ppv %>%
+  filter(!is.na(MinsCar)) %>%
+  tally()
+```
+No NAs in any minutes activity variables.
+
+
+## Sense checks 
+
+? Mins... travel of 10 hours or more and 30 hours or more.
+```{r MinsCycling sense checks}
+ppv %>% 
+  filter(MinsCycling>599) %>%
+  select (ID, MinsCycling) %>%
+  arrange(desc(MinsCycling)) %>%
+  View()
+## 60 records over 6 hours
+## IDs 4638 (MinsCycling=7453) and 1723 (MinsCycling=7320) are entry errors
+
+## Over 30 hours 
+ppv %>% 
+  filter(MinsCycling>1799) %>%
+  select (ID, MinsCycling) %>%
+  arrange(desc(MinsCycling))
+## 5 records 
+```
+
+```{r MinsWalking sense checks}
+## Over 6 hours
+ppv %>% 
+  filter(MinsWalking>599) %>%
+  select (ID, MinsWalking) %>%
+  arrange(desc(MinsWalking)) %>%
+  View()
+## 229 records  
+## IDs 4638 (MinsWalking=172523501793) and 4685 (MinsWalking=202220) are entry errors
+
+## Over 30 hours 
+ppv %>% 
+  filter(MinsWalking>1799) %>%
+  select (ID, MinsWalking) %>%
+  arrange(desc(MinsWalking))
+## 7 records 
+```
+
+```{r MinsCar sense checks}
+ppv %>% 
+  filter(MinsCar>599) %>%
+  select (ID, MinsCar) %>%
+  arrange(desc(MinsCar)) %>%
+  View()
+## 180 records over 6 hours 
+## IDs 4500 (MinsCar=36600) and 5107 (MinsCar=7500) are entry errors 
+
+## Over 30 hours
+ppv %>% 
+  filter(MinsCar>1999) %>%
+  select (ID, MinsCar) %>%
+  arrange(desc(MinsCar))
+## 12 records 
+```
+
+## Plots
+
+```{r Mins... sense check plot}
+
+ppv.minsx <- ppv %>%
+  select(ID, MinsCar, MinsCycling, MinsWalking) %>%
+  filter(MinsCycling>0 & MinsCycling<4000, MinsWalking>0 & MinsWalking<4000, MinsCar>0 & MinsCar<4000) %>%
+  gather(key = minsType, value = minutes, -ID)
+
+labelSize = 3
+
+labelsMins <- data.frame(c("MinsCar", "MinsCycling", "MinsWalking"), c("180 records of 10+ hours travel", "60 records of 10+ hours travel" ,"229 records of 10+ hours travel"))
+colnames(labelsMins) <- c("minsType","nGT599")
+
+p.minsxFacet <- ggplot(ppv.minsx, aes(x = minutes)) +
+  geom_histogram(colour="#999999",fill="#999999",binwidth=15) +
+  facet_grid(minsType~.) +
+  geom_vline(xintercept = 600, colour = "black", linetype = "dotted") +
+  annotate("text", label = paste("10 hours"), x = 560, y = 30 , size = labelSize, angle = 90, hjust = 0) +
+  geom_text(x=2000, y=35, data=labelsMins, aes(label=nGT599)) +
+  labs(title = "Histograms of minutes spent driving, cycling and walking") +
+  labs(x = "Minutes\n(values less than 4000)", y = "Frequency\n(15 minute bins)")
+
+p.minsxFacet
+
+ggsave(file="./Figures/minsFacetHist.png", plot=p.minsxFacet, width=15, height=11)
+
+rm(labelSize, labelsMins, ppv.mc, ppv.minsx, p.mc, p.minsxFacet)
+
+```
+
+## Add flagging variables for travel of 10 hours or more
+```{r Add Mins greater or equal to 10 hours flagging variable}
+ppv <- ppv %>%
+  mutate(MinsCycling_10h = ifelse(MinsCycling > 599, 1, NA), MinsWalking_10h = ifelse(MinsWalking > 599, 1, NA), MinsCar_10h = ifelse(MinsCar > 599, 1, NA))
+```
+
+
+
+
+

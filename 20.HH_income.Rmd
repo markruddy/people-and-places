@@ -1,0 +1,83 @@
+---
+title: "HH_income checks"
+author: "Mark Ruddy"
+date: "31 July 2016"
+output: html_document
+---
+
+
+Load libraries and data
+```{r Setup, include=FALSE}
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(knitr)
+library(ggplot2)
+# setwd("/Users/markruddy/Documents/Personal/Work/DataScience/PeopleAndPlaces/")
+# load("./Data/pp.data.RData")
+```
+
+
+## Task
+
+Recode *HH_income* prefer not to say as user-missing.
+
+'Prefer not to say' response to *HH_income* question was option value 4.
+
+Explore variable.
+```{r Scope variable HH_income}
+## Temp data
+ppv.tmp <- ppv
+
+## Explore data
+ppv.tmp %>%
+  select(ID, HH_income) %>%
+  arrange(desc(HH_income)) %>%
+  group_by(HH_income) %>%
+  summarise(count=n()) %>%
+  View()
+```
+There are 1000 'Prefer not to say' responses. 
+422 NAs correspond to 'Missing' listed in the 'codebook.pdf'.
+
+Reassign *HH_income*=4 to NA.
+```{r Reassign HH_income values}
+## Rassign and check through count
+ppv.tmp %>%
+  mutate(HH_income = ifelse(HH_income==4, NA, HH_income)) %>%
+  select(ID, HH_income) %>%
+  arrange(desc(HH_income)) %>%
+  group_by(HH_income) %>%
+  summarise(count=n()) %>%
+  View()
+## OK
+
+## Set changes
+ppv.tmp <- ppv.tmp %>%
+  mutate(HH_income = ifelse(HH_income==4, NA, HH_income))
+
+ppv <- ppv.tmp
+
+## Clean up
+rm(ppv.tmp)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

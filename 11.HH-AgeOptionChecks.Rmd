@@ -1,0 +1,179 @@
+---
+title: "HH age option checks"
+author: "Mark Ruddy"
+date: "19 July 2016"
+output: html_document
+---
+
+```{r Libraries}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+```
+
+## Tasks
+
+Sense check all these in relation to hh structure; flag anything odd.
+
+## Sense check
+
+### Initial exploration
+```{r Preliminary data explortation}
+ppv %>%
+  select(ID, HH_u5:HH_2_65plus) %>%
+  gather(AgeGrp, Number, -ID, na.rm=T) %>%
+  filter(Number>0) %>%
+  group_by(AgeGrp) %>%
+  summarise(max=max(Number),
+            min=min(Number),
+            count=n()) %>%
+  knitr::kable()
+```
+
+Minimum and maximum household number values by age:
+
+|AgeGrp      | max| min| count|
+|:-----------|---:|---:|-----:|
+|HH_16_24    |   5| 0.5|   847|
+|HH_2_16_24  |   2| 1.0|    37|
+|HH_2_65plus |   2| 1.0|   266|
+|HH_25_44    |  60| 1.0|  1472|
+|HH_45_64    |  10| 1.0|  1435|
+|HH_5_15     |   5| 1.0|   810|
+|HH_65plus   |   6| 1.0|   273|
+|HH_u5       |   3| 1.0|   503|
+
+
+### Investigate not whole numbers.
+```{r Outliers that are not whole numbers}
+## eg in HH_16_24
+## Function to test for whole numbers
+library(gmp) # For is.whole() function
+ppv %>%
+  select(ID, HH_number, HH_u5:HH_2_65plus) %>%
+  gather(AgeGrp, Number, -ID, na.rm=T) %>%
+  mutate(int = is.whole(Number)) %>%
+  filter(int==F) %>%
+  knitr::kable()
+
+```
+Record ID 4811 has a value of *HH_16_24*=0.5 and HH_number=2.5
+
+```{r Investigate record ID 4811 further}
+glimpse(ppv %>% filter(ID==4811))
+```
+There is some evidence to suggest the value for *HH_16_24* here should be 1 and the *HH_number* value should be 3. This is because *Household*=4 (A couple with children). I will therefore update *HH_16_24* to 1 and *HH_number* to 3 for record ID=4811, assuming only one child is present in the household.
+
+```{r Update HH_16_24 to 1 and HH_number to 3 for record ID 4811}
+ppv.tmp <- ppv
+
+## Update ID=4811
+ppv.tmp <-ppv.tmp %>%
+  mutate(HH_16_24 = ifelse(ID==4811, 1, HH_16_24)) %>%
+  mutate(HH_number = ifelse(ID==4811, 3, HH_number))
+
+## Check update
+ppv.tmp %>% filter(ID%in%c(4811-10):c(4811+10)) %>% select(ID, HH_number, HH_u5:HH_2_65plus)
+
+ppv <- ppv.tmp
+
+## Clean up
+rm(ppv.tmp)
+```
+
+
+### Investigate outliers
+Exploring *HH-age-number* variable outliers as well as HH_number in more detail.
+```{r Investigate records with outliers greater-than 9}
+ppv %>%
+  select(ID, HH_u5:HH_2_65plus) %>%
+  gather(AgeGrp, Number, -ID, na.rm=T) %>%
+  filter(Number>9) %>%
+  spread(AgeGrp, Number) %>%
+  knitr::kable()
+```
+
+|   ID| HH_25_44| HH_45_64|
+|----:|--------:|--------:|
+| 1213|       12|       NA|
+| 1635|       12|       NA|
+| 3213|       12|       NA|
+| 3599|       60|       10|
+| 5090|       11|       NA|
+
+Record ID 3599 has 60 25-44 year-old adults and 10 45-64 year-old adults.
+
+```{r Explore record ID 3599}
+ppv %>%
+  filter(ID==3599) %>%
+  select(ID, HH_number, HH_text, HH_u5:HH_2_65plus)
+```
+This record comes from a response from an individual who lives in hostel (from HH_text) of 70 people. This record will be left unchanged but is highlighted as a potential outlier in later analysis.
+
+
+```{r Explore records where HH_25_44 greater-than 10}
+ppv %>%
+  filter(HH_25_44>9 & HH_25_44<59) %>%
+  select(ID, HH_number, HH_text, HH_u5:HH_2_65plus)
+```
+These records of Household sizes between 11 and 12 could all be considered valid - HH_number matches or HH_text supports.
+
+
+```{r Plot household number values by age, excluding extremes}
+## Excluding ID=3599 
+ppv.HH_age <- ppv %>%
+  select(ID, HH_u5:HH_2_65plus) %>%
+  gather(AgeGrp, Number, -ID, na.rm=T) %>%
+  filter(Number>0 & ID!=3599) %>%
+  group_by(AgeGrp)
+  
+p.HH_age <- ggplot(ppv.HH_age, aes(AgeGrp, Number))
+
+p.HH_age + 
+  geom_jitter(height=0.2, width=0.6, alpha=0.3) + 
+  scale_y_continuous(breaks=seq(1, 13, 1)) +
+  labs(title="People per household age-group", x="Age Group", y="Number in household")
+
+## Clean up
+rm(Household_v, p.HH_age, ppv.HH_age)
+```
+
+The vast majority of values fall between 1 nd 5.  Investigate outliers in plot.
+*HH_65plus*=6
+```{r Investigate HH_65plus outlier in plot}
+ppv %>% 
+  filter(HH_65plus>5) %>%
+  glimpse()
+```
+Nothing in information t
+
+```{r Investigate HH_25_44 outliers in plot}
+ppv %>% 
+  filter(HH_25_44>5) %>%
+  select(ID, HH_number, HH_text, HH_u5:HH_2_65plus, Borough, Source) %>%
+  arrange(HH_number) %>%
+  View()
+```
+Responses 793 and 1213 come from a shared house (*HH_text*). It is possible that ID 793 and 2441 come from the same household because they have the same age-number split in the same Borough. Although there is no other evidence supporting these higher *HH-age* and *HH_number* values within each record, there are no internal inconsistencies or counter evidence to suggest that these are erroneous.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

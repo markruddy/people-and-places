@@ -1,0 +1,173 @@
+---
+title: "HH-Vehicle"
+author: "Mark Ruddy"
+date: "21 July 2016"
+output: html_document
+---
+
+
+## Tasks
+
+Variables: HH_carvan:HH_kidcyc ("HH_carvan", "HH_mcycle", "HH_othermv", "HH_adcyc", "HH_kidcyc")
+
+1. Change refused to missing
+2. Sense check; flag up anything odd
+3. Create new variable for no car hh/one car hh/two or more car hh
+
+
+## Change refused to missing
+
+From 6.EntryChecks.Rmd and codebook.pdf there are no 'refused to answer' coded values.
+
+## Sense checks
+
+### Data type
+HH_carvan:HH_kidcyc are character variables and need converting to numeric for best evaluaiton results.
+```{r Convert to numeric}
+
+ppv.tmp <- ppv
+
+ppv.tmp2 <- ppv.tmp %>% 
+  mutate(HH_carvan = as.numeric(HH_carvan)) %>%
+  mutate(HH_mcycle = as.numeric(HH_mcycle)) %>%
+  mutate(HH_othermv = as.numeric(HH_othermv)) %>%
+  mutate(HH_adcyc = as.numeric(HH_adcyc)) %>%
+  mutate(HH_kidcyc = as.numeric(HH_kidcyc))
+
+## Check
+ppv.tmp %>% 
+  select(ID, HH_kidcyc) %>% # HH_carvan, HH_mcycle, HH_othermv, HH_adcyc, HH_kidcyc
+  gather(v, n, -ID, na.rm=T) %>%
+  group_by(n) %>%
+  summarise(count=n())
+
+ppv.tmp2 %>% 
+  select(ID, HH_kidcyc) %>% # HH_carvan, HH_mcycle, HH_othermv, HH_adcyc, HH_kidcyc
+  gather(v, n, -ID, na.rm=T) %>%
+  group_by(n) %>%
+  summarise(count=n())
+## All ok
+
+## Set changes
+ppv <- ppv.tmp2
+
+## Clean up
+rm(ppv.tmp2, ppv.tmp)
+
+```
+
+
+```{r Preliminary data exploration}
+ppv %>%
+  select(ID, HH_carvan:HH_kidcyc) %>%
+  gather(VehGrp, Number, -ID, na.rm=T) %>%
+  filter(Number>0) %>%
+  group_by(VehGrp) %>%
+  summarise(max=max(Number),
+            median=median(Number),
+            min=min(Number),
+            total=n()) %>%
+  knitr::kable()
+```
+|VehGrp   | max| median| min| total|
+|:----------|---:|------:|---:|-----:|
+|HH_adcyc   |  16|      2|   1|  2292|
+|HH_carvan  |  10|      1|   1|  3476|
+|HH_kidcyc  |   8|      2|   1|   650|
+|HH_mcycle  |  12|      1|   1|   238|
+|HH_othermv |  10|      1|   1|    32|
+
+
+```{r Plot HH transport to explore variation}
+
+ppv.HH_veh <- ppv %>%
+  select(ID, HH_carvan:HH_kidcyc) %>%
+  gather(VehGrp, Number, -ID, na.rm=T) %>%
+  filter(Number>0) %>%
+  group_by(VehGrp)
+  
+p.HH_veh <- ggplot(ppv.HH_veh, aes(VehGrp, Number))
+
+p.HH_veh + 
+  geom_jitter(height=0.2, width=0.5, alpha=0.3) + 
+  scale_y_continuous(breaks=seq(1, 17, 1)) +
+  labs(title="Vehicle types in households", x="Vehicle type", y="Number in household")
+
+## Clean up
+rm(p.HH_veh, ppv.HH_veh)
+
+```
+
+Given the spread of values within each group in these data, a flagging variable *HH_vehicle_query* will be created for the following outliers.
+
+HH_carvan > 4
+HH_mcycle > 3
+HH_othermv > 2
+HH_adcyc > 6
+HH_kidcyc > 4
+
+This will allow open decision making later in the data analysis process.
+
+```{r Create flagging variable HH_vehicle_query}
+ppv.tmp <- ppv
+
+ppv.tmp2 <- ppv.tmp %>%
+  mutate(HH_vehicle_query = ifelse(HH_carvan>4, 1, NA)) %>%
+  mutate(HH_vehicle_query = ifelse(is.na(HH_vehicle_query), ifelse(HH_mcycle>3, 1, HH_vehicle_query), HH_vehicle_query)) %>%
+  mutate(HH_vehicle_query = ifelse(is.na(HH_vehicle_query), ifelse(HH_othermv>2, 1, HH_vehicle_query), HH_vehicle_query)) %>%
+  mutate(HH_vehicle_query = ifelse(is.na(HH_vehicle_query), ifelse(HH_adcyc>6, 1, HH_vehicle_query), HH_vehicle_query)) %>%
+  mutate(HH_vehicle_query = ifelse(is.na(HH_vehicle_query), ifelse(HH_kidcyc>4, 1, HH_vehicle_query), HH_vehicle_query))
+
+## Check
+ppv.tmp2 %>%
+  select(ID, HH_vehicle_query, HH_carvan:HH_kidcyc) %>%
+  View()
+## OK
+
+ppv %>% filter(HH_vehicle_query==1) %>% tally()
+
+## Set changes
+ppv <- ppv.tmp2
+
+## Clean up
+rm(ppv.tmp, ppv.tmp2)
+```
+There are 43 records that require vetting in terms of household vehicle numbers.
+
+
+## Create new variable for no car hh/one car hh/two or more car hh
+This is based upon variable HH_carvan.
+Where 
+```{r Create new variable HH_carvan_sum}
+
+ppv.tmp <- ppv
+
+ppv.tmp <- ppv.tmp %>%
+  mutate(HH_carvan_sum = ifelse(is.na(HH_carvan), 0, 
+                                ifelse(HH_carvan==0, 0,
+                                       ifelse(HH_carvan==1, 1,
+                                              ifelse(HH_carvan>1, 2, NA))))) 
+
+## Check update
+ppv.tmp %>%
+  select(ID, HH_carvan, HH_carvan_sum) %>%
+  sample_frac(0.1, replace = F) %>% # 10% check
+  View()
+## All ok
+
+## Set changes
+ppv <- ppv.tmp
+
+## Clean up
+rm(ppv.tmp)
+```
+
+
+
+
+
+
+
+
+
+

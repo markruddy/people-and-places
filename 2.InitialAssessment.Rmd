@@ -1,0 +1,47 @@
+---
+title: "People and Places initial assessment"
+author: "Mark Ruddy"
+date: "13 June 2016"
+output: html_document
+
+description: "Assessment of People and Places dataset sample"
+---
+
+
+Some variables are character data class but should be numeric to enable easy evaluation.
+```{r Recode to numeric}
+## create temp working dataset
+ppv.tmp <- ppv
+
+## show data class for variables
+sapply(ppv.tmp, class)
+
+## Alter data type for some variables from character to numeric.
+## string variables that should be numeric for data evaluation - from consultation with variable descriptions in codebook.pdf
+cols <- c('Cycleweek','Walkweek','Carweek','MinsCycling','MinsWalking','MinsCar','Walk1min','Walk2min','Walk3min','Walk4min','Walk5min','Walk6min','Walk7min', 'Cyc1min', 'Cyc2min', 'Cyc3min', 'Cyc4min', 'Cyc5min', 'Cyc6min', 'Cyc7min', 'Car1min', 'Car2min', 'Car3min', 'Car4min', 'Car5min', 'Car6min', 'Car7min')
+
+## Change character 'cols' to numeric
+ppv.tmp[cols] <- sapply(ppv.tmp[cols], as.numeric)
+
+## Check data class
+sapply(ppv.tmp[cols], class)
+
+sapply(pp[cols], class)
+
+## Replace dataset
+ppv <- ppv.tmp
+
+## Clean up
+rm(ppv.tmp, cols)
+
+## Save
+save.image("../Data/pp.data.RData")
+```
+
+
+
+
+
+
+
+

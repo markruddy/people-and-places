@@ -1,0 +1,90 @@
+---
+title: "HH_text checks and changes"
+author: "Mark Ruddy"
+date: "15 July 2016"
+output: html_document
+---
+
+## Check Household description variable
+
+Instruction: "Change refused to missing"
+
+```{r Check Household}
+ppv %>%
+  select(Household) %>%
+  distinct()
+```
+There were no 'refused to answer' responses.
+
+
+## Check HH_text
+
+Instruction: "Recode where possible; or code as OTHER"
+
+```{r Check HH_text entries}
+## Extract HH_text and HH_number to output and assess in spreadsheet.
+HHtext_ID <- ppv %>%
+  filter(!is.na(HH_text)) %>%
+  select(ID, HH_text, HH_number) %>%
+  arrange(HH_text) %>%
+  View()
+## There are 177 different responses.
+
+## Output to allow manual recoding of responses.
+write.csv(HHtext_ID, file = "./Outputs/HHtext_ID-num.csv")
+## Use this to edit as spreadsheet and add a column named 'codes'.
+```
+
+### Integrate manually recoded HH_text
+
+Manually recoded household description entries from 'HH_text' added back to dataset as new variable.
+```{r Add HH_text csv to dataset}
+
+## The HH_text entries have been coded numerically following the Household variable coding as:
+codes <- 1:6
+text <- c("Single adult living alone",
+"Single adult living with other adults", "A couple without children", "A couple with children", "Other", "Single adult living with children")
+NewCode <- data.frame(codes, text)
+View(NewCode)
+
+## Load manually recoded HH_text
+HH_new <- read.table(file="./Outputs/HHtext_ID-num.csv",sep = "\t", stringsAsFactors = FALSE, header = TRUE)
+
+## Add HH_new entries back to ppv, matching ID
+
+ppv.tmp <- ppv %>% select(-HH_text_code, -HH_text_new)
+
+## Join HH_new and ppv by common ID
+ppv.tmp <- left_join(ppv.tmp, HH_new, by = "ID")
+
+## Join ppv.new and codes by common Code
+ppv.tmp <- left_join(ppv.tmp, NewCode, "codes")
+
+## Check structure of ppv.new
+str(ppv, list.len=228)
+
+## Only retain recoded HH_text and Code
+
+ppv.tmp <- ppv.tmp %>%
+  rename(HH_text_code = codes, HH_text = HH_text.x, HH_number = HH_number.x) %>%
+  mutate(HH_text_new = as.character(text)) %>%
+  select(-X, -HH_text.y, -HH_number.y, -text)
+
+ppv <- ppv.tmp
+
+rm(ppv.tmp, NewCode, HH_new, HHtext_ID, text, codes)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+

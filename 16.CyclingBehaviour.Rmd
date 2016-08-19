@@ -1,0 +1,313 @@
+---
+title: "Cycling behaviour variables"
+author: "Mark Ruddy"
+date: "27 July 2016"
+output: html_document
+---
+
+Load libraries and data
+```{r Setup, include=FALSE}
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(knitr)
+library(ggplot2)
+# setwd("/Users/markruddy/Documents/Personal/Work/DataScience/PeopleAndPlaces/")
+# load("./Data/pp.data.RData")
+```
+
+## Tasks
+
+1. *Cancyc*: Create new variable where people who do cycle are added in (this was only asked to those who hadn't cycled in last week)
+2. Create new variable adding in people who can't cycle (as not having cycled)
+3. Combine *Other_ad_cyc* and *Other_ad_cyc2*
+4. *HH_child_cyc*: Ensure missing (for ppl with no kids) is distinguished from any missing (did not answer)
+5. *Commcyc*, *Esccyc*, *Foodcyc*, *Friendcyc*: Add in system missing and ensure distinguished from did not answer
+
+
+
+
+## 1. *Cancyc* plus other that ride bicycles
+
+Combine *Cancyc* with other indicators of having cycled in the last week (ie DairyXcyc and CycXmin), with Cycleweek and MinsCycling, and Cyc12mon and Cycmonth.
+
+```{r Check extra people that ride a bicycle}
+## Temp df
+ppv.tmp <- ppv
+
+## Select variables that indicate cycling use
+cyc.dat <- ppv.tmp %>%
+  select(ID, Cycleweek, MinsCycling, starts_with("Diary"), ends_with("min"), Cyc12mon, Cycmonth) %>%
+  select(ID, MinsCycling, ends_with("cyc"), starts_with("Cyc"), -contains("mcyc")) %>% View()
+
+## Create Cancyc2 variable showing evidence of cycle use from other cycling variables
+cyc.can <- cyc.dat %>%
+  mutate(Cancyc2 = ifelse(rowSums(.[2:17], na.rm=T)>0,1,NA)) %>% 
+  mutate(Cancyc2 = ifelse(is.na(Cancyc2) & Cyc12mon==1, 1, ifelse(is.na(Cancyc2) & Cycmonth==1, 1, Cancyc2)))
+
+## Check Cancyc2 records
+cyc.can %>%
+  filter(Cancyc2==1) %>% View()
+
+## Cross-check Cancyc (!=1) with Cancyc2 (=1) for any missing cyclists
+cyc.can %>%
+  select(ID, Cancyc2) %>%
+  left_join(ppv.tmp, ., "ID") %>%
+  filter((Cancyc!=1 | is.na(Cancyc)) & Cancyc2==1) %>%
+  # filter(Cancyc==1 | Cancyc2==1) %>%
+  select(ID, Cycleweek, MinsCycling, starts_with("Diary"), ends_with("min"), Cyc12mon, Cycmonth, Cancyc, Cancyc2) %>%
+  select(ID, Cycleweek, MinsCycling, Cancyc, Cancyc2, ends_with("cyc"), starts_with("Cyc"), -contains("mcyc")) %>%
+  # select(ID, Cancyc, Cancyc2) %>%
+  View() 
+```
+There are 923 additional entries for people that can ride a bicycle.
+
+```{r Create new variable for all people who can ride a bicycle}
+## New variable Cancyc_all that combines Cancyc and other evidence of cycling
+ppv.tmp2 <- cyc.can %>%
+  select(ID, Cancyc2) %>%
+  left_join(ppv.tmp, ., "ID") %>%
+  mutate(Cancyc_all = ifelse(is.na(Cancyc2) & Cancyc==1, 1, Cancyc2)) %>%
+  select(-Cancyc2)
+
+## Check update
+ppv.tmp2 %>%
+  # summarise(sum=sum(Cancyc_all, na.rm=T))
+  select(ID, Cancyc, Cancyc_all, Cycleweek, MinsCycling, starts_with("Diary"), ends_with("min")) %>%
+  select(ID, Cancyc_all, Cancyc, Cycleweek, MinsCycling, ends_with("cyc"), starts_with("Cyc"), -contains("mcyc")) %>%
+  sample_n(200) %>%
+  View()
+## Update OK - now 3997 responses from people that can cycle
+
+## Set changes
+ppv <- ppv.tmp2
+
+## Clean up
+rm(cyc.can, cyc.dat, ppv.tmp, ppv.tmp2)
+```
+There are 3997 responses from people that can cycle in *Cancyc_all*
+
+
+## 2. Create new variable adding in people who can't cycle (as not having cycled)
+
+Need new variables that combines values of 2 and 3 (not able to ride a bicycle) from *Cancyc* with 'not ridden pedal cycle' responses from *Cyc12mon* and *Cycmonth*. 
+
+Create new variables:
+*Cycmonth_all_not*
+*Cyc12mon_all_not*
+
+Create *Cycmonth_all_not*
+```{r Create Cycmonth_all_not}
+## Temp dataset
+ppv.tmp <- ppv
+
+## Create new variable
+ppv.tmp2 <- ppv.tmp %>%
+  mutate(Cycmonth_all_not = ifelse(Cancyc %in% c(2,3), 1, 
+                               ifelse(Cycmonth == 2, 1, NA)))
+
+## Check
+ppv.tmp2 %>% 
+  select(ID, Cancyc, Cycmonth, Cycmonth_all_not) %>%
+  # filter(Cycmonth_all_not==1) %>%
+  # tally()
+  sample_n(300) %>%
+  View()
+## OK
+
+## Set changes
+ppv <- ppv.tmp2
+
+## Clean up
+rm(ppv.tmp, ppv.tmp2)
+```
+Including those people who cannot cycle, there are 1389 records of not cycling in the last month.
+
+Create *Cyc12mon_all_not*
+```{r Create Cyc12mon_all_not}
+## Temp dataset
+ppv.tmp <- ppv
+
+## Create new variable
+ppv.tmp2 <- ppv.tmp %>%
+  mutate(Cyc12mon_all_not = ifelse(Cancyc %in% c(2,3), 1, 
+                               ifelse(Cyc12mon == 2, 1, NA)))
+## Check
+ppv.tmp2 %>% 
+  select(ID, Cancyc, Cyc12mon, Cyc12mon_all_not) %>%
+  # filter(Cyc12mon_all_not==1) %>%
+  # tally()
+  sample_n(200) %>%
+  View()
+
+# glimpse(ppv.tmp2)
+## OK
+
+## Set changes
+ppv <- ppv.tmp2
+
+## Clean up
+rm(ppv.tmp, ppv.tmp2)
+```
+Including those people who cannot cycle, there are 2350 records of not cycling in the last 12 months.
+
+
+## 3. Combine *Other_ad_cyc* and *Other_ad_cyc2*
+Combine entries from these two variables.
+
+```{r Combine Other_ad_cyc with Other_ad_cyc2}
+## temp data
+ppv.tmp <- ppv
+
+## Create combined variable
+ppv.tmp <- ppv.tmp %>%
+  mutate(Other_ad_cyc_all = ifelse(Other_ad_cyc==1, 1, NA)) %>%
+  mutate(Other_ad_cyc_all = ifelse(is.na(Other_ad_cyc_all), ifelse(Other_ad_cyc2==1, 1, Other_ad_cyc_all), Other_ad_cyc_all))
+
+## Check
+ppv.tmp %>%
+  select(ID, Other_ad_cyc, Other_ad_cyc2, Other_ad_cyc_all) %>%
+  sample_n(200) %>%
+  View()
+## OK
+
+# ppv.tmp %>%
+#   filter(Other_ad_cyc_all==1) %>%
+#   tally()
+
+## Set changes
+ppv <- ppv.tmp
+
+## Clean up
+rm(ppv.tmp)
+```
+There are 2076 responses where respondant knows smeone who cycles regularly.
+
+
+## 4. *HH_child_cyc*: Ensure missing (for ppl with no kids) is distinguished from any missing (did not answer)
+
+### Sense check
+Compare *HH_child_cyc* with indicators of respondant with children through *Household* values 4 and 6 and create new variable *HH_child_cyc_query* flagging conflicts
+```{r HH_child_cyc compare with indicators of children}
+## Test data
+ppv.tmp <- ppv
+
+## Select columns and filter for chcildren that cycle (HH_child_cyc==1 | HH_child_cyc==2) compared with possible indicator of no children (Household!=4 & Household!=6)
+## Create new variable HH_child_cyc_query flagging conflicts
+HHccq <- ppv.tmp %>% 
+  select(ID, Household, HH_child_cyc, HH_text) %>%
+  # filter(Household==4 | Household==6) %>%
+  filter((HH_child_cyc==1 | HH_child_cyc==2) & (Household!=4 & Household!=6)) %>%
+  mutate(HH_child_cyc_query = 1) %>%
+  select(ID, HH_child_cyc_query) 
+
+## Join with original table 
+ppv.tmp2 <- ppv.tmp %>%
+  full_join(HHccq, "ID") %>%
+  glimpse()
+
+## Check
+ppv.tmp2 %>%
+  select(ID, HH_child_cyc_query, Household, HH_child_cyc, HH_text) %>%
+  View()
+## OK
+
+## Set changes
+ppv <- ppv.tmp2
+
+## Clean up
+rm(ppv.tmp2, ppv.tmp, HHccq)
+```
+There are 30 responses where there is posible conflict between Household value and *HH_child_cyc* value. These are flagged in the *HH_child_cyc_query* variable.
+
+
+
+### Ensure missing (for ppl with no kids) is distinguished from any missing (did not answer)
+
+Set *HH_child_cyc* values for respondants without children to 5. Values that are NA mean there was no answer.
+
+An categorical indictor of respondants without children is *Household* values 1 and 3.
+```{r Set HH_child_cyc without children to -99}
+## Test data
+ppv.tmp <- ppv
+
+## Check for any HH_child_cyc entries where Household is childless (Household==1 | Household==3).
+ppv.tmp %>%
+  select(ID, Household, HH_child_cyc, HH_text) %>%
+  filter(!is.na(HH_child_cyc) & (Household==1 | Household==3)) %>%
+  View()
+## There are none of these
+
+## Query for no HH_child_cyc entries in Households that are childless (Household==1 | Household==3). Update HH_child_cyc entries to 5 for this combination.
+ppv.tmp2 <- ppv.tmp %>%
+  mutate(HH_child_cyc = ifelse((Household==1 | Household==3), 5, HH_child_cyc))
+## There are 2246 of these entries
+
+## Check
+glimpse(ppv.tmp2)
+
+ppv.tmp2 %>%
+  filter(HH_child_cyc==5) %>%
+  tally()
+
+ppv %>%
+  select(ID, Household, HH_child_cyc) %>%
+  sample_n(400) %>%
+  arrange(desc(HH_child_cyc)) %>%
+  View()
+## OK
+
+## Set changes
+ppv <- ppv.tmp2
+
+## Clean up
+rm(ppv.tmp2,ppv.tmp)
+```
+Updated 2246 *HH_child_cyc* entries=5 to distingiuish childless households (*Household*=1 or 3) from missing *HH_child_cyc* entries.
+
+
+## 5. *Commcyc*, *Esccyc*, *Foodcyc*, *Friendcyc*: Add in system missing and ensure distinguished from did not answer
+
+Compare against other indicators of cycling.
+```{r Scope variables}
+ppv.tmp <- ppv
+
+ppv.tmp %>%
+  select(Commcyc) %>%
+  group_by(Commcyc) %>%
+  summarise(count=n())
+
+## Check *Commcyc*, *Esccyc*, *Foodcyc* *Friendcyc* entries against other cycling indicators (*Cycevid*).
+Reasoncyc <- ppv.tmp %>%
+  select(ID, contains("Cycling"), starts_with("Cyc"), ends_with("cyc"), -contains("HH"), -contains("ad"), -contains("not"), -contains("Area"), -contains("Total"), -contains("query"), -Cancyc, -contains("mcyc"), Commcyc) %>%
+  mutate(Cycevid = ifelse(rowSums(.[2:17], na.rm=T)>0,1,NA)) %>% 
+  mutate(Cycevid = ifelse((is.na(Cycevid) & Cycmonth==1), 1, Cycevid)) 
+
+## Where reason for cycling not alongside other cycling evidence
+Reasoncyc %>%
+  filter(Cycevid!=1 & (Commcyc>=1 | Esccyc>=1 | Foodcyc>=1 | Friendcyc>=1))
+## There are no conflicts where *Commcyc*, *Esccyc*, *Foodcyc* *Friendcyc* are not also found with other indicators of cycling
+
+## Clean up
+rm(Reasoncyc, ppv.tmp)
+```
+There are no conflicts where *Commcyc*, *Esccyc*, *Foodcyc*, *Friendcyc* are not also found with other indicators of cycling.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

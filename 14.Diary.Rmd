@@ -1,0 +1,453 @@
+---
+title: "Diary"
+author: "Mark Ruddy"
+date: "21 July 2016"
+output: html_document
+---
+
+
+```{r Load packages}
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(knitr)
+```
+
+## Tasks
+
+1. Sense check and change refused to missing
+2. Create new variables for any use of mcycle, PT, or taxi during that week
+3. Create variables for how many days each mode was used (e.g. Dayswalking etc.)
+4. Create new variables for 
+  a) number of days' walking, 
+  b) number of days cycling, 
+  c) number of days active travel in past week
+
+## 1. Sense check
+
+There are no refused entries (see 6.EntryChecks.Rmd).
+
+```{r View data}
+ppv %>%
+  select(ID, starts_with("Diary")) %>%
+  sample_frac(0.1,replace = F) %>%
+  View()
+```
+
+
+Possible issues:
+
+### Are there any entries in Diary?none alongside other entries for that day?
+```{r Diary?none with Diary?some check}
+ppv.tmp <- ppv
+
+## Tidy data and introduce 2 more IDs: one for each entry, one for each day entered per response
+ppv.d.long <- ppv.tmp %>%
+  select(ID, starts_with("Diary")) %>% 
+  gather(Diary, Entry, -ID) %>%
+  mutate(EntryID = 1:dim(.)[1], DayID = sprintf("%s%s", ID, substr(Diary, 1, 6))) %>%
+  arrange(ID, Diary)
+
+## Filter in 3 steps for where 'none' responses also have another response for the same day.
+ppv.d.long %>%
+  filter(grepl("none", Diary) & Entry==1) %>%
+  inner_join(ppv.d.long, "DayID") %>%
+  filter(!Entry.y==1 & !Diary.y==grepl("none", Diary.y)) %>%
+  arrange(ID.y, Diary.y) %>%
+  filter(Entry.y==1)
+  View()
+
+## There aren't any!
+
+## Clean up
+rm(ppv.tmp, ppv.d.long)
+```
+No conflicts between Diary?none and other diary entries.
+
+
+### Are there daily totals of different modes that seem implausible?
+
+Within records, check how many modes were entered for each day.
+
+```{r Modes per day check}
+ppv.tmp <- ppv
+
+## Check sum entries per day within IDs
+diary <- c("Diary1", "Diary2", "Diary3", "Diary4", "Diary5", "Diary6", "Diary7")
+ppv.tmp %>% select(starts_with(diary[1])) %>% # replace index in diary[1] to choose day
+  rowSums(na.rm=T) %>%
+  data.frame(.) %>% 
+  bind_cols(ppv.tmp, .) %>%
+  setNames(., c(names(ppv.tmp), "DaySum")) %>%
+  filter(DaySum>=4) %>% 
+  select(ID, DaySum, starts_with(diary[1])) %>% # replace index in diary[1] to choose day
+  gather(DiaryDay, DaySum, -ID) %>%
+  arrange(desc(DaySum)) %>%
+  View()
+
+## Clean up
+rm(diary, ppv.tmp)
+```
+Some days have up to 6 modes entered. These seem to be valid but a flag will be created to allow assessment later in the project.
+
+Create flagging variable.
+```{r Create flag for 5 or more modes per day}
+## New group_by approach
+ppv.tmp <- ppv
+
+## find responses where there are 5 or more modes entered for a day
+modeGT4 <- ppv.tmp %>%
+  select(ID, starts_with("Diary")) %>% 
+  gather(Diary, Entry, -ID) %>%
+  mutate(Diary.day = substr(Diary, 1, 6)) %>%
+  group_by(ID, Diary.day) %>%
+  summarise(Sum=sum(Entry, na.rm=T)) %>%
+  ungroup() %>%
+  filter(Sum>=5) %>%
+  distinct(ID) %>%
+  select(ID, Sum)
+
+## Create flagging variable 
+ppv.tmp <- ppv.tmp %>%
+  mutate(Diary_Sum_Query = ifelse(ID%in%unlist(modeGT4[,"ID"]), 1, NA)) 
+
+## Check new variable
+ppv.tmp %>%
+  select(ID, starts_with("Diary"), Diary_Sum_Query) %>% 
+  filter(Diary_Sum_Query==1) %>%
+  View()
+
+## Set changes
+ppv <- ppv.tmp
+
+## Clean up
+rm(modeGT4, ppv.tmp)
+```
+There are 9 responses where there are 5 or more modes listed in one day.
+
+
+
+## 2. Create new variable(s?) for any use of mcycle, PT, or taxi during that week
+```{r Create mcycle, PT, or taxi variable}
+## Temporary dataset
+ppv.tmp <- ppv
+
+# Total cyc
+totModes <- ppv.tmp %>%
+  select(ID, ends_with("PT"), ends_with("taxi"), ends_with("mcyc")) %>% 
+  select(ID, starts_with("Diary")) %>%
+  mutate(Total_mode = rowSums(.[,-1], na.rm=T)) %>%
+  mutate(Total_mode = ifelse(Total_mode==0, NA, Total_mode)) %>%
+  arrange(Total_mode) %>%
+  select(ID, Total_mode) #%>% View()
+
+
+# Join Total_cyc variable to dataset
+ppv.tmp2 <- ppv.tmp %>%
+  left_join(totModes, "ID") %>%
+  mutate(Total_mode = ifelse(!is.na(Total_mode), 1, NA)) %>%
+  rename(Total_mcycTaxiPT = Total_mode)
+
+## Set changes
+ppv <- ppv.tmp2
+  
+## Clean up
+rm(ppv.tmp, ppv.tmp2, totModes)
+```
+
+
+## 3. Variables for how many days each mode was used
+
+### Walking
+How many total days walking from Diary?walk
+```{r Total diary days walking}
+## Temporary dataset
+ppv.tmp <- ppv
+
+# Total walk
+totWalk <- ppv.tmp %>%
+  select(ID, starts_with("Diary")) %>%
+  select(ID, ends_with("walk")) %>%
+  mutate(Total_walk = rowSums(.[,-1], na.rm=T)) %>%
+  mutate(Total_walk = ifelse(Total_walk==0 & is.na(rowSums(.[,-1])), NA, Total_walk)) %>%
+  select(ID, Total_walk)
+
+# Join Total walk variable to dataset
+ppv.tmp2 <- ppv.tmp %>%
+  left_join(totWalk, "ID") 
+
+#glimpse(ppv.tmp2)
+
+## Check
+# ppv.tmp2 %>%
+#   select(ID, starts_with("Diary"), Total_walk) %>%
+#   select(ID, ends_with("walk")) %>%
+#   sample_frac(0.1) %>%
+#   arrange(Total_walk) %>%
+#   View()
+## OK
+
+## Set changes
+ppv <- ppv.tmp
+  
+## Clean up
+rm(ppv.tmp, ppv.tmp2, totWalk)
+```
+
+
+### Cycles
+How many total days cycling from Diary?cyc
+```{r Total diary days cycling}
+## Temporary dataset
+ppv.tmp <- ppv
+
+# Total cyc
+totCyc <- ppv.tmp %>%
+  select(ID, starts_with("Diary")) %>%
+  select(ID, ends_with("cyc")) %>%
+  select(-ends_with("mcyc")) %>% # because 'cyc' picks up 'mcyc' too so need to remove latter
+  mutate(Total_cyc = rowSums(.[,-1], na.rm=T)) %>%
+  mutate(Total_cyc = ifelse(Total_cyc==0 & is.na(rowSums(.[,-1])), NA, Total_cyc)) %>%
+  select(ID, Total_cyc)
+  #sample_frac(0.1) %>% arrange(Total_cyc) # 10% check
+
+# Join Total_cyc variable to dataset
+ppv.tmp2 <- ppv.tmp %>%
+  left_join(totCyc, "ID") 
+
+# glimpse(ppv.tmp2)
+
+## Check
+# ppv.tmp2 %>%
+#   select(ID, starts_with("Diary"), Total_cyc) %>%
+#   select(ID, ends_with("cyc")) %>%
+#   select(-ends_with("mcyc")) %>%
+#   sample_frac(0.1) %>%
+#   arrange(Total_cyc) %>%
+#   View()
+## OK
+
+## Set changes
+ppv <- ppv.tmp2
+  
+## Clean up
+rm(ppv.tmp, ppv.tmp2, totCyc)
+```
+
+
+### Motorcycles
+How many total days motorcycling from Diary?mcyc
+```{r Total diary days motorcycling}
+## Temporary dataset
+ppv.tmp <- ppv
+
+# Total mcyc
+totMcyc <- ppv.tmp %>%
+  select(ID, starts_with("Diary")) %>%
+  select(ID, ends_with("mcyc")) %>%
+  mutate(Total_mcyc = rowSums(.[,-1], na.rm=T)) %>%
+  mutate(Total_mcyc = ifelse(Total_mcyc==0 & is.na(rowSums(.[,-1])), NA, Total_mcyc)) %>%
+  select(ID, Total_mcyc)
+
+# Join Total_mcyc variable to dataset
+ppv.tmp2 <- ppv.tmp %>%
+  left_join(totMcyc, "ID") 
+
+# glimpse(ppv.tmp2)
+
+## Check
+# ppv.tmp2 %>%
+#   select(ID, starts_with("Diary"), Total_mcyc) %>%
+#   select(ID, ends_with("mcyc")) %>%
+#   sample_frac(0.1) %>%
+#   arrange(Total_mcyc) %>%
+#   View()
+## OK
+
+## Set changes
+ppv <- ppv.tmp2
+  
+## Clean up
+rm(ppv.tmp, ppv.tmp2, totMcyc)
+```
+
+
+### Public transport
+How many total days public transport from Diary?mcyc
+```{r Total diary days public transport}
+## Temporary dataset
+ppv.tmp <- ppv
+
+# Total PT
+totPT <- ppv.tmp %>%
+  select(ID, starts_with("Diary")) %>%
+  select(ID, ends_with("PT")) %>%
+  mutate(Total_PT = rowSums(.[,-1], na.rm=T)) %>%
+  mutate(Total_PT = ifelse(Total_PT==0 & is.na(rowSums(.[,-1])), NA, Total_PT)) %>% 
+  select(ID, Total_PT)
+  
+
+# Join Total_PT variable to dataset
+ppv.tmp2 <- ppv.tmp %>%
+  left_join(totPT, "ID") 
+
+# glimpse(ppv.tmp2)
+
+## Check
+# ppv.tmp2 %>%
+#   select(ID, starts_with("Diary"), Total_PT) %>%
+#   select(ID, ends_with("PT")) %>%
+#   sample_frac(0.1) %>%
+#   arrange(Total_PT) %>%
+#   View()
+## OK
+
+## Set changes
+ppv <- ppv.tmp2
+  
+## Clean up
+rm(ppv.tmp, ppv.tmp2, totPT)
+```
+
+### Taxi
+How many total days using taxis from Diary?mcyc
+```{r Total diary days taxi}
+## Temporary dataset
+ppv.tmp <- ppv
+
+# Total taxi
+totTaxi <- ppv.tmp %>%
+  select(ID, starts_with("Diary")) %>%
+  select(ID, ends_with("taxi")) %>%
+  mutate(Total_taxi = rowSums(.[,-1], na.rm=T)) %>%
+  mutate(Total_taxi = ifelse(Total_taxi==0 & is.na(rowSums(.[,-1])), NA, Total_taxi)) %>% 
+  select(ID, Total_taxi)
+  
+
+# Join Total_taxi variable to dataset
+ppv.tmp2 <- ppv.tmp %>%
+  left_join(totTaxi, "ID") 
+
+# glimpse(ppv.tmp2)
+
+## Check
+# ppv.tmp2 %>%
+#   select(ID, starts_with("Diary"), Total_taxi) %>%
+#   select(ID, ends_with("taxi")) %>%
+#   sample_frac(0.1) %>%
+#   arrange(Total_taxi) %>%
+#   View()
+## OK
+
+## Set changes
+ppv <- ppv.tmp2
+  
+## Clean up
+rm(ppv.tmp, ppv.tmp2, totTaxi)
+```
+
+### Car
+How many total days driving from Diary?mcyc
+```{r Total diary days driving}
+## Temporary dataset
+ppv.tmp <- ppv
+
+# Total car
+totCar <- ppv.tmp %>%
+  select(ID, starts_with("Diary")) %>%
+  select(ID, ends_with("car")) %>%
+  mutate(Total_car = rowSums(.[,-1], na.rm=T)) %>%
+  mutate(Total_car = ifelse(Total_car==0 & is.na(rowSums(.[,-1])), NA, Total_car)) %>% 
+  select(ID, Total_car)
+  
+
+# Join Total_car variable to dataset
+ppv.tmp2 <- ppv.tmp %>%
+  left_join(totCar, "ID") 
+
+# glimpse(ppv.tmp2)
+
+## Check
+# ppv.tmp2 %>%
+#   select(ID, starts_with("Diary"), Total_car) %>%
+#   select(ID, ends_with("car")) %>%
+#   sample_frac(0.1) %>%
+#   arrange(Total_car) %>%
+#   View()
+## OK
+
+## Set changes
+ppv <- ppv.tmp2
+  
+## Clean up
+rm(ppv.tmp, ppv.tmp2, totCar)
+```
+
+## 4. Create new variables for number of days' walking, cycling, active travel in past week
+
+```{r Create walking-cycling variable}
+## Temporary dataset
+ppv.tmp <- ppv
+
+## Gather cycling and walking diary entries. Generate combined DayModeID (ID+'diary day' - eg Diary1). DayModeID will be used to group each day's active travel.
+act_long <- ppv.tmp %>%
+  select(ID, ends_with("walk"), ends_with("cyc")) %>% 
+  select(-ends_with("mcyc")) %>%
+  select(ID, starts_with("Diary")) %>%
+  gather(DayMode, Entry, -ID) #%>% View()
+
+## Group active travel using DayModeID and sum.
+act_days <- act_long %>%
+  mutate(DayModeID = paste0(ID, substr(DayMode, 0, 6))) %>%
+  group_by(DayModeID) %>%
+  summarise(SumDayMode = sum(Entry, na.rm=T)) %>%
+  ## Create 0,1 flag for an active day
+  mutate(Active_flag = ifelse(SumDayMode>=1, 1, 0)) %>% ## There are no NAs in the results
+  ## Recreate ID to group by for sum number days active
+  mutate(ID = substr(DayModeID, 0, nchar(DayModeID)-6)) %>% mutate(ID = as.integer(ID)) %>%
+  ## Group by ID and sum Active_day
+  ungroup() %>% group_by(ID) %>%
+  summarise(Active_days = sum(Active_flag))
+
+## Test and check data, and introduce NAs
+act_days_NA <- ppv.tmp %>%
+  left_join(act_days, "ID") %>%
+  select(ID, Active_days, ends_with("walk"), ends_with("cyc")) %>% 
+  select(-ends_with("mcyc")) %>%
+  select(ID, Active_days, starts_with("Diary")) %>%
+  ## Make Active_days NA where all active mode diary entries NA
+  mutate(Active_days = ifelse(Active_days==0 & is.na(rowSums(.[,-1])), NA, Active_days)) %>%
+  select(ID, Active_days)
+  #sample_frac(0.1) %>% 
+  #arrange(Active_days) %>% View()
+
+## Join to main ppv dataset by ID
+ppv.tmp2 <- ppv.tmp %>%
+  left_join(act_days_NA, "ID")
+
+#glimpse(ppv.tmp2)
+
+## Check
+# ppv.tmp2 %>%
+#   select(ID, Active_days, ends_with("walk"), ends_with("cyc")) %>% 
+#   select(-ends_with("mcyc")) %>%
+#   select(ID, Active_days, starts_with("Diary")) %>%
+#   sample_frac(0.1) %>%
+#   arrange(Active_days) %>%
+#   View()
+## OK
+
+## Set changes
+ppv <- ppv.tmp2
+  
+## Clean up
+rm(ppv.tmp, ppv.tmp2, act_long, act_days, act_days_NA)
+```
+
+
+
+
+
+
+
+

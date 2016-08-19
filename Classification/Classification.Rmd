@@ -1,0 +1,91 @@
+---
+title: "SurveyGroup_Classification"
+author: "Mark Ruddy"
+date: "17 August 2016"
+output: html_document
+---
+
+
+Load libraries and data
+```{r Load libraries, include=FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(knitr)
+library(kernlab)
+
+setwd("~/Documents/Personal/Work/DataScience/PeopleAndPlaces")
+load("./Data/pp.class.RData")
+```
+
+## Support Vector Machine Classification
+
+A number of different classification techniques are available, each with their own pros, cons, and assumptions. For this analysis Support Vector Machines (SVMs) will be used. The Support Vector Machine (SVM) is a supervised machine learning method well-suited to solving classification problems in complex datasets, including non-linear ones. SVMs have a number of strengths[][1] such as:
+
+* Resistance to overfitting (loss of ability to generalise).
+* Provide globally optimal solution with the same answer across multiple model runs.
+* No ‘black box’ - cf. Artificial Neural Networks (ANNs).
+* Computationally efficient.
+* Ability to handle mixed data types.
+
+An SVM model will be 'trained' to differentiate as best as possible between Oyster and Cycle-hire database responses based on a selection of feature variables. Training involves experimentation with model parameter combinations in order to identify values that offer the best classification performance.
+
+<!-- Following a training phase a testing. -->
+
+## Feature variable selection and preprocessing
+
+Of the feature variables considered to be potentially viable for classification, training will initially be trialled with the following subset: 
+
+*MinsCycling*, *MinsWalking*, *MinsCar*, *HH_carvan*, *Total_walk*, *Total_cyc*, *Total_mcyc*, *Total_PT*, *Total_taxi*, *Total_car*
+
+A limited but targeted selection of feature variables based around transport mode will reduce computational penalties in training whilst - hopefully - capture key differences between members of Oyster and Cycle-hire databases.
+
+### Data types and SVM requirements
+
+From the above feature variable slection, *MinsCycling*, *MinsWalking*, *MinsCar*, *HH_carvan*, and *Total_?* are strictly bounded continuous variables (although arguably *MinsCycling*, *MinsWalking*, and *MinsCar* could be thought of as unbounded). These will be rescaled to -1,1 within the R function being employed to implement SVM.
+
+<!--*Emp_?_reas* variables are asymmetric binary variables. The state of having a particular employment state is more important than being without employment.-->
+
+<!--* Are the data types of variables?
+  * Continuous - 
+  * Interval - order with measureable difference eg time
+  * Nominal (categorical including binary) - groups with no implied rank
+  * Ordinal-->
+  
+## Model Training
+
+Three parameters influencing classification model performance and will be varied:
+
+| Parameter | Description |
+|:---------|:----------|
+| **Kernel type and bandwidth (sigma)** | Kernels describe distance decay around feature variables. A Radial Basis kernel ‘Gaussian’ generally performs well and will be used with a variety of bandwidths.|
+| **Insensitive loss function (epsilon)** | This controls the width of the zone used in fitting the training data [][2]. Epsilon determines the amount of data used to support the model (the support vectors): large epsilon values produce a less complex model with fewer support vectors [][2].|
+| **Error penalisation constant (C)** | The level of acceptable error around Epsilon. Large C values allow less training error but may overfit the model. Small C values may give larger training errors but result in a model that can generalise more easily.|
+[Table 2: SVR parameters.][tabSVMParams]
+
+
+Many methods to predetermine parameter values have been suggested[][2]. This study adopted a pragmatic grid search approach. Using a Radial Basis kernel ‘Gaussian’, three potential values for epsilon (0.01, 0.1, 0.5) were trialled. Along with these epsilon values, exponential sequences of values for sigma and C were generated. 
+
+All three parameters were iterated over in combination. Combinations were run with models embdeded with three different lengths of time series (m=15 minutes, 30 minutes, or 1 hour), resulting in 1080 models per link. 
+
+Tuning was performed on the two representative links 448 and 1593. 
+
+SVM was carried out using the kernlab package [][3] with bespoke functions in R[^All data and R code is available on GitHub at <>].
+
+
+
+
+## References
+
+[1]: Aggarwal, Charu. C. (2015). An Introduction to Data Classification. In *Data Classification*, edited by Charu. C. Aggarwal. CRC Press.
+
+[2]: Cherkassky, V., & Ma, Y. (2004). Practical selection of {SVM} parameters and noise estimation for {SVM} regression. *Neural Networks*, 17(1), 113 – 126.
+
+[3]: Karatzoglou, A., Meyer, D., & Hornik, K. (2006). Support Vector Machines in R. *Journal of Statistical Software*, 15(9), 1–28. Retrieved from http://www.jstatsoft.org/v15/i09
+
+
+
+
+
+
+

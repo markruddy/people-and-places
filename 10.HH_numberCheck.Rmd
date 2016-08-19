@@ -1,0 +1,354 @@
+---
+title: "HH_number sense check and data change"
+author: "Mark Ruddy"
+date: "17 July 2016"
+output: html_document
+---
+
+## HH_number check
+
+Instruction: Sense check ? >8 is odd. Cross check with other person number data.
+
+### Check values in HH_number variable.
+Anything >8 needs investigating.
+```{r Value HH_number}
+ppv %>%
+  filter(HH_number>8, is.na(HH_text)) %>%
+  select(ID) %>%
+  View()
+## The following IDs don't have good explanations for >8 household members: 1257, 1635, 1785, 2441, 3213, 5090
+
+## Missing value=-99
+ppv %>%
+  select(HH_number) %>%
+  distinct() %>%
+  arrange(HH_number)
+## There are no missing values coded as -99.
+
+## NAs
+ppv %>%
+  select(HH_number) %>%
+  filter(is.na(HH_number)) %>%
+  count()
+## There are 2257 NAs
+```
+
+### Check values in Household number by age variables.
+Check for anything >8.
+```{r Value Household number by age variables}
+ppv %>%
+  select(ID, Household, HH_number, HH_u5:HH_2_45_64) %>%
+  gather(HH_num_age, num, -ID:-HH_number) %>%
+  filter(num>8) %>%
+  spread(HH_num_age, num)
+## There are 6 Household number by age entries that are >8. Comparing these with other Household variables suggests these can be explained and are genuine.
+```
+
+## Cross-check HH_number with Household numbers by age (HH-number-by-age) variables.
+
+Compare HH_number with: 
+1. Diagreements summing across HH-number-by-age variables
+2. NAs
+
+
+```{r HH_number - HH-number-by-age disagreements}
+## Compare HH_number with sum of Household members by age.
+
+## Disagreements including those caused by -99 in HH-number-by-age.
+#ppv.tmp <- 
+ppv %>%
+  select(ID, Household, HH_number, HH_u5:HH_2_45_64) %>%
+  gather(HH_num_age, num, -ID:-HH_number) %>%
+  group_by(ID) %>%
+  mutate(HH_sum = sum(num, na.rm=T)) %>%
+  ungroup() %>%
+  mutate(HH_num_age_dis = ifelse(HH_sum<0, 2, # -99 values
+                          ifelse(HH_number!=HH_sum, 1, NA))) %>% # Real disagreements
+  spread(HH_num_age, num) %>%
+  filter(HH_num_age_dis%in%1:2) %>%
+  View()
+## 36 records 
+
+## Disagreements caused by -99 values
+ppv %>%
+  select(ID, Household, HH_number, HH_u5:HH_2_45_64) %>%
+  gather(HH_num_age, num, -ID:-HH_number) %>%
+  group_by(ID) %>%
+  mutate(HH_sum = sum(num, na.rm=T)) %>%
+  ungroup() %>%
+  mutate(HH_num_age_dis = ifelse(HH_sum<0, 2, # -99 values
+                          ifelse(HH_number!=HH_sum, 1, NA))) %>% # Real disagreements
+  spread(HH_num_age, num) %>%
+  filter(HH_num_age_dis==2) %>%
+  View()
+## There are 16 records with -99 entries within all the ten Household numbers by age variables.
+
+
+ppv %>%
+  select(ID, Household, HH_number, HH_u5:HH_2_45_64) %>%
+  gather(HH_num_age, num, -ID:-HH_number) %>%
+  group_by(ID) %>%
+  mutate(HH_sum = sum(num, na.rm=T)) %>%
+  ungroup() %>%
+  mutate(HH_num_age_dis = ifelse(HH_sum<0, 2, # -99 values
+                          ifelse(HH_number!=HH_sum, 1, NA))) %>% # Real disagreements
+  spread(HH_num_age, num) %>%
+  filter(HH_num_age_dis==1) %>%
+  View()
+## There are 20 real disagreements between HH_numbers and HH-number-by-age.
+```
+
+
+Add flagging variable for HH_number - HH-number-by-age disagreements
+```{r Add HH_number - HH-number-by-age disagreement flag}
+## Produce df with ID and HH_num_age_dis (flagging HH_number - HH-number-by-age disagreements )
+HH_age_check <- ppv %>%
+  select(ID, Household, HH_number, HH_u5:HH_2_45_64) %>%
+  gather(HH_num_age, num, -ID:-HH_number) %>%
+  group_by(ID) %>%
+  mutate(HH_sum = sum(num, na.rm=T)) %>%
+  ungroup() %>%
+  mutate(HH_num_age_dis = ifelse(HH_sum<0, 2, # -99 values
+                          ifelse(HH_number!=HH_sum, 1, NA))) %>% # Real disagreements
+  spread(HH_num_age, num) %>%
+  filter(HH_num_age_dis%in%1:2) %>%
+  select(ID, HH_num_age_dis)
+
+## Temporary ppv df
+ppv.tmp <- ppv
+
+## Join ppv.tmp and HH_age_check using ID
+ppv.tmp.j <- left_join(ppv.tmp, HH_age_check, "ID")
+
+ppv.tmp.j %>%
+  select(ID, HH_number, HH_u5:HH_2_65plus, HH_num_age_dis) %>%
+  filter(HH_num_age_dis%in%1:2) %>%
+  View()
+## Verified
+
+## Replace ppv
+ppv <- ppv.tmp.j
+
+## Clean up
+rm(ppv.tmp, ppv.tmp.j, HH_age_check)
+```
+
+## HH_number merge single household number.
+
+Instruction: Merge single person household numbers into here as these are missing.
+
+Find single person Households that do not have HH_number=1.
+```{r Find single person households}
+ppv %>%
+  select(ID, Household, HH_number, HH_text_code) %>%
+  filter(Household==1, is.na(HH_number) | HH_number!=1) %>%
+  View()
+```
+There are 870 'Single adult living alone' Household entries which don't have a comparable HH_number=1. These are all NAs.
+
+```{r Update HH_number where Household is 1}
+## IDs to update - for cross-checking
+HH_singles <- ppv %>%
+  filter(Household==1, is.na(HH_number) | HH_number!=1) %>%
+  select(ID)
+
+ppv.tmp <- ppv
+
+## Update HH_number
+ppv.tmp2 <- ppv.tmp %>%
+  mutate(HH_number = ifelse(is.na(HH_number) & Household==1,1,HH_number))
+
+## Cross-check update
+ppv.tmp2 %>%
+  anti_join(HH_singles) %>%
+  View()
+## Zero records returned
+
+## Save update
+ppv <- ppv.tmp2
+
+## Clean up
+rm(ppv.tmp, HH_singles, ppv.tmp2)
+```
+
+
+## Other HH_number NAs 
+Check for other NAs in HH_number.
+
+```{r Household value codes}
+codes <- c(1:6,8)
+text <- c("Single adult living alone",
+"Single adult living with other adults", "A couple without children", "A couple with children", "Other", "Single adult living with children", "Refused to answer")
+Household_v <- data.frame(Household=codes, Value=text)
+rm(codes,text)
+```
+
+```{r Find other NAs in HH_number}
+ppv %>%
+  filter(!is.na(Household) & is.na(HH_number)) %>%
+  group_by(Household) %>%
+  summarise(count = n()) %>%
+  right_join(Household_v, by = "Household") %>%
+  select(Value, count, Household) %>%
+  knitr::kable()
+```
+Need to update HH_number from the following:
+
+|Value                                 | count| Household|
+|:-------------------------------------|-----:|---------:|
+|Single adult living with other adults |     2|         2|
+|A couple without children             |  1376|         3|
+|A couple with children                |     6|         4|
+|Other                                 |     2|         5|
+|Single adult living with children     |     1|         6|
+
+### Update 'Single adult living with other adults'
+There are 2 instances of Household=2 but HH_number is NA.
+Is there any additional information to be able to determine the size of the household?
+
+```{r Investigate HH_number where Household is 2}
+ppv %>%
+  filter(Household==2, is.na(HH_number)) %>%
+  select(ID, HH_number, Household, HH_text, HH_u5:HH_2_65plus) %>%
+  knitr::kable()
+```
+There is no additional information that can be used here to infer HH_number.
+Create a variable to flag this issue.
+
+```{r Add flagging variable HH_number_query}
+ppv <- ppv %>%
+  mutate(HH_number_query = ifelse(Household==2 & is.na(HH_number), 1, NA))
+```
+
+
+### 'A couple without children' NAs in HH_number:
+There are 1376 instances of Household=3 (A couple without children) but HH_number is NA.
+HH_number can be updated to 2 for these records.
+```{r Update HH_number where Household is 3}
+## IDs to update - for cross-checking
+HH_coupleNoChild <- ppv %>%
+  filter(Household==3, is.na(HH_number)) %>%
+  select(ID)
+
+ppv.tmp <- ppv
+
+## Update HH_number
+ppv.tmp2 <- ppv.tmp %>%
+  mutate(HH_number = ifelse(is.na(HH_number) & Household==3,2,HH_number))
+
+## Cross-check update
+ppv.tmp2 %>%
+  semi_join(HH_coupleNoChild) %>%
+  View()
+
+ppv.tmp2 %>% filter(HH_number==2 & Household==3) %>% select(ID, HH_number, Household)
+## 1376 records returned
+
+## Save update
+ppv <- ppv.tmp2
+
+## Clean up
+rm(HH_coupleNoChild, ppv.tmp, ppv.tmp2)
+```
+
+### Update 'A couple with children'
+There are 6 instances of Household=4 (A couple with children) but HH_number is NA.
+Is there any additional information to be able to determine the size of the household?
+```{r Investigate HH_number where Household is 4}
+## 
+ppv %>%
+  filter(Household==4, is.na(HH_number)) %>%
+  select(ID, HH_number, Household, HH_text, HH_u5:HH_2_65plus) %>%
+  knitr::kable()
+```
+There appears to be no additional information that can be used to infer HH_number here.
+Update HH_number_query variable flagging this issue.
+
+```{r Update flagging variable HH_number_query}
+ppv.tmp <- ppv
+
+ppv.tmp <- ppv.tmp %>%
+  mutate(HH_number_query = ifelse(Household==4 & is.na(HH_number), 1, HH_number_query))
+
+ppv.tmp %>% filter(HH_number_query==1) %>% select(ID, Household, HH_number, HH_number_query)
+
+ppv <- ppv.tmp
+
+rm(ppv.tmp)
+```
+
+
+### Update 'Other'
+There are 2 instances of Household=5 (Other) but *HH_number* is NA.
+Is there any additional information to be able to determine the size of the household?
+```{r Investigate HH_number where Household is 5}
+ppv %>%
+  filter(Household==5, is.na(HH_number)) %>%
+  select(ID, HH_number, Household, HH_text, HH_u5:HH_2_65plus) %>%
+  knitr::kable()
+```
+The HH_text for record ID 1009 indicates that this household consists of a 'couple with a child. So we can update HH_number for this record to 3.
+
+Record ID 4231 contains no additional information that can be used to infer *HH_number*. *HH_number_query* variable will be updated to flag this issue.
+
+```{r Update HH_number as 3 for ID 1009}
+ppv.tmp <- ppv
+
+ppv.tmp <- ppv.tmp %>%
+  mutate(HH_number = ifelse(ID==1009, 3, HH_number))
+
+ppv.tmp %>% filter(ID==1009) %>% select(ID, Household, HH_number)
+
+ppv <- ppv.tmp
+
+rm(ppv.tmp)
+```
+
+
+```{r Update flagging variable HH_number_query for ID 4231}
+ppv.tmp <- ppv
+
+ppv.tmp <- ppv.tmp %>%
+  mutate(HH_number_query = ifelse(ID==4231, 1, HH_number_query))
+
+ppv.tmp %>% filter(HH_number_query==1) %>% select(ID, Household, HH_number, HH_number_query)
+
+ppv <- ppv.tmp
+
+rm(ppv.tmp)
+```
+
+### 'Single adult living with children'
+There is 1 instance of *Household*=6 (Single adult living with children) but *HH_number() is NA.
+Is there any additional information to be able to determine the size of the household?
+
+```{r Investigate HH_number where Household is 6}
+ppv %>%
+  filter(Household==6, is.na(HH_number)) %>%
+  select(ID, HH_number, Household, HH_text, HH_u5:HH_2_65plus) %>%
+  knitr::kable()
+```
+There appears to be no additional information that can be used to infer *HH_number* here.
+Update *HH_number_query* variable flagging this issue.
+
+```{r Update flagging variable HH_number_query}
+ppv.tmp <- ppv
+
+ppv.tmp <- ppv.tmp %>%
+  mutate(HH_number_query = ifelse(Household==6 & is.na(HH_number), 1, HH_number_query))
+
+ppv.tmp %>% filter(HH_number_query==1) %>% select(ID, Household, HH_number, HH_number_query)
+
+ppv <- ppv.tmp
+
+rm(ppv.tmp)
+```
+
+
+
+
+
+
+
+
+

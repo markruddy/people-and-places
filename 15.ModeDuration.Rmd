@@ -1,0 +1,218 @@
+---
+title: "ModeDurationDay"
+author: "Mark Ruddy"
+date: "25 July 2016"
+output: html_document
+---
+
+Load libraries and data
+```{r Setup, include=FALSE}
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(knitr)
+library(ggplot2)
+setwd("/Users/markruddy/Documents/Personal/Work/DataScience/PeopleAndPlaces/")
+load("./Data/pp.data.RData")
+```
+
+
+## Tasks
+
+Sense check and change refused to missing for Walk?min, Cyc?min and Car?min.
+Look at daily entries of 8 hours (480 minutes) or more.
+
+```{r Tidy data}
+
+ppv.tmp <- ppv
+
+## Tidy and group into modes
+daymode_long <- ppv.tmp %>%
+  select(ID, ends_with("min")) %>%
+  gather(DayMode, Entry, -ID) %>%
+  mutate(Mode = ifelse(grepl("Walk", DayMode), "Walking",
+                       ifelse(grepl("Cyc", DayMode), "Cycling",
+                              ifelse(grepl("Car", DayMode), "Driving", NA)))) %>%
+  group_by(Mode)
+
+## Look for records of activity of 8 hours or more
+daymode_long %>% 
+  select(ID, DayMode, Entry) %>%
+  filter(Entry>=480) %>%
+  ungroup() %>%
+  arrange(desc(Entry)) %>%
+  rename(Minutes=Entry) %>%
+  kable(caption="List of responses with walking, cycling or driving of 8+ hours in a day")
+
+## Count responses
+daymode_long %>% 
+  select(ID, DayMode, Entry) %>%
+  filter(Entry>=480) %>%
+  ungroup() %>%
+  select(ID, -DayMode, -Entry) %>%
+  group_by(ID) %>%
+  summarise(count=n())
+## 53 responses
+
+## Check IDs
+# ppv.tmp %>%
+#   select(ID, Walk1min:Car7min) %>%
+#   filter(ID==271) %>%
+#   View()
+```
+
+* There are 99 entries from 53 responses of 8 or more hours per day for each activity.
+* Seventeen entries are greater than 24 hours (1440 minutes) and obviously erroneous.
+* Three entries are below 24 hours but above 14 hours and need further assessment.
+* The remaining 79 entries may need further assessment.
+
+
+## Plots of minutes entered by mode
+Explore the distribution of entries for each mode with evidently erroneous values (above 840 minutes - 14hrs)) removed.
+```{r Jitter plot minutes entered by mode}
+## Remove error entries - above 840 minutes (14hrs) - and NAs
+daymode_ <- daymode_long %>%
+  na.omit() %>%
+  filter(Entry<840) %>%
+  mutate(Hours = Entry/60)
+
+p.daymode <- ggplot(daymode_, aes(Mode, Hours))
+
+p.daymode + 
+  geom_jitter(height=0.2, width=0.5, alpha=0.3) + 
+  #ylim(0, 90) +
+  #ylim(0, 14) +
+  scale_y_continuous(breaks=seq(0, 14, 1)) +
+  labs(title="Minutes spent each day walking, cycling and driving", x="Mode", y="Hours")
+
+## Clean up
+rm(daymode_, p.daymode)
+
+##? Possibility of a shiny dashboard solution here
+```
+
+
+## Add flagging variables for modes entered as 8 hours or more.
+
+A flagging variable will be created for each mode indicating entries that are or exceed 8 hours (480 minutes).
+
+```{r Add Mins greater or equal to 10 hours flagging variable}
+
+ppv.tmp <- daymode_long %>%
+  ungroup() %>%
+  filter(Mode=="Walking") %>%
+  mutate(Walk_min_query = ifelse(Entry>=480, 1, NA)) %>%
+  spread(DayMode, Entry) %>%
+  select(ID, Walk_min_query) %>%
+  distinct(ID) %>%
+  # filter(Walk_min_query==1)
+  left_join(ppv.tmp, ., "ID")
+  
+ppv.tmp <- daymode_long %>%
+  ungroup() %>%
+  filter(Mode=="Cycling") %>%
+  mutate(Cyc_min_query = ifelse(Entry>=480, 1, NA)) %>%
+  spread(DayMode, Entry) %>%
+  select(ID, Cyc_min_query) %>%
+  distinct(ID) %>%
+  left_join(ppv.tmp, ., "ID")
+
+ppv.tmp <- daymode_long %>%
+  ungroup() %>%
+  filter(Mode=="Driving") %>%
+  mutate(Car_min_query = ifelse(Entry>=480, 1, NA)) %>%
+  spread(DayMode, Entry) %>%
+  select(ID, Car_min_query) %>%
+  distinct(ID) %>%
+  # filter(Walk_min_query==1)
+  left_join(ppv.tmp, ., "ID")
+
+ppv.tmp %>%
+  select(ID, Walk1min:Car7min, Walk_min_query, Cyc_min_query, Car_min_query) %>%
+  filter(Walk_min_query==1 | Cyc_min_query==1 | Car_min_query==1)
+
+## Set changes
+ppv <- ppv.tmp
+
+## Clean up
+rm(daymode_long, ppv.tmp)
+```
+
+## Check for mis-matches between Diary and modal Mins entries.
+Are there disagreements between days where diary entries (Diary?) and minutes spent (?min) entries
+
+```{r Diary and modal Mins mis-matches}
+## Test dataset
+ppv.tmp <- ppv
+
+## Select Diary? ?min variables of interest
+diary.mins <- ppv.tmp %>%
+  select(ID, starts_with("Diary"), ends_with("min")) %>%
+  select(-contains("mcyc"), -contains("Query"), -ends_with("PT"), -ends_with("taxi"), -ends_with("unsure"), -ends_with("none"), -ends_with("ref")) #%>% glimpse()
+
+## Tidy data and create new variable DayMode (just day and mode).
+## This gives a value shared between Diary? and ?min entries for same day in a response that can be grouped-by later in mis-match test
+diary.mins <- diary.mins %>%
+  gather(Variable, Value, -ID) %>%
+  mutate(DayMode = ifelse(grepl("Diary", Variable), substr(Variable, 6, nchar(Variable)), NA)) %>%
+  mutate(DayMode = ifelse(grepl("^Walk", Variable), paste0(substr(Variable, 5, 5), "walk"), DayMode)) %>%
+  mutate(DayMode = ifelse(grepl("^Cyc", Variable), paste0(substr(Variable, 4, 4), "cyc"), DayMode)) %>%
+  mutate(DayMode = ifelse(grepl("^Car", Variable), paste0(substr(Variable, 4, 4), "car"), DayMode))
+
+
+## Mis-match test
+## Group-by ID and DatMode to check for consistency between two different entries for same day.
+diary.mins <- diary.mins %>%
+  mutate(Value = as.numeric(Value))
+
+glimpse(diary.mins)
+
+## Using dev version of dplyr July 27, 2016 from GitHub
+diary.match <- diary.mins %>%
+  group_by(ID, DayMode) %>%
+  mutate(mismatch = ifelse(is.na(Value) & lag(is.na(Value)), 0, # Capture both NA
+                       ifelse((is.na(Value) & lag(Value==0)) | (Value==0 & lag(is.na(Value))), 0, 
+                          ifelse((Value>0 & lag(Value)==0) | (Value==0 & lag(Value)>0), 1, 
+                             ifelse((Value>0 & lag(is.na(Value))) | (is.na(Value) & lag(Value>0)), 1, 0))))) #%>% View()
+
+## Show which variables are in conflict
+diary.mismatch <- diary.match %>% 
+  ungroup() %>%
+  filter(mismatch==1) %>%
+  select(-Value, -mismatch) %>%
+  arrange(ID, DayMode, Variable) %>%
+  rename("ModeXmin" = Variable, "DiaryXmode" = DayMode) %>%
+  mutate(DiaryXmode = paste0("Diary", DiaryXmode))  #%>%
+  # kable(caption="DiaryXmode and ModeXmin entries in conflict")
+
+## Check conflicts
+## Matrix of mismatches
+diary.mismatch.wide <- diary.mismatch %>%
+  spread(DiaryXmode, ModeXmin) %>%
+  setNames(paste0("Diary", names(.)))
+
+## Check matrix to confirm presence of mismatches
+ppv.tmp %>%
+  select(ID, starts_with("Diary"), ends_with("min")) %>%
+  select(-contains("mcyc"), -contains("Query"), -ends_with("PT"), -ends_with("taxi"), -ends_with("unsure"), -ends_with("none"), -ends_with("ref")) %>%
+  filter(ID==267) %>%
+  View()
+
+rm(diary.mins, diary.match, ppv.tmp)
+```
+There are 181 responses where differences exist between DiaryXmode and ModeXmin entries for the same day. These can be found listed in table "diary.mismatch" and as a matrix in "diary.mismatch.wide".
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

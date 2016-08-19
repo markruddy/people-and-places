@@ -1,0 +1,30 @@
+---
+title: "Load 'People and Places' dataset"
+author: "Mark Ruddy"
+date: "13 July 2016"
+output: html_document
+
+description: "Load data from .xls file"
+---
+
+```{r load People and Places dataset}
+
+## load package to read .xlsx file
+library(readxl)
+
+## set working directory
+setwd("/Users/markruddy/Documents/Personal/Work/DataScience/PeopleAndPlaces/Data/Original")
+
+## read in data
+pp = read_excel(path = "1PeoplePlaces__all.xlsx")
+
+## Create version of pp dataset to edit
+ppv <- pp
+
+## reset working directory
+setwd("/Users/markruddy/Documents/Personal/Work/DataScience/PeopleAndPlaces/Working")
+
+## save R data
+save.image("../Data/pp.data.RData")
+
+```

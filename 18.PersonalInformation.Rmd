@@ -1,0 +1,413 @@
+---
+title: "Personal Information"
+author: "Mark Ruddy"
+date: "29 July 2016"
+output: html_document
+---
+
+Load libraries and data
+```{r Setup, include=FALSE}
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(knitr)
+library(ggplot2)
+# setwd("/Users/markruddy/Documents/Personal/Work/DataScience/PeopleAndPlaces/")
+# load("./Data/pp.data.RData")
+```
+
+
+## Tasks
+
+1. *Gender*: Create dummy gender variable with male, female, other(missing).
+2. *Age*: Check and change to numerical variable, or missing (for refused or invalid) and also create new variable for different age categories, suggest under 25/25-34,35-44,45-54,55-64,65+
+3. *Ethnicity*: Create new variable that is white/BAME or missing/refused
+4. *Disability*: Change 'prefer not to say' to user-missing
+5. *Disability_oth*: Check and recode if necessary before creating new single variable
+
+
+1. *Gender*: Create dummy gender variable with male, female, other(missing).
+
+New variable *Gender_summary*. *Gender* will map to *Gender_summary* as follows:
+
+|Option|*Gender*|*Gender_summary*|
+|:----|:-------|:---------------|
+|Male |1       |1               |
+|Female|2     | 2               |
+|Other|3      | 3               |
+|Prefer not to say|4  |3        |
+|Missing  | -99   |3            |
+|NA       |NA     |3            |
+
+```{r Creat Gender_summary variable}
+## test data
+ppv.tmp <- ppv
+
+ppv.tmp2 <- ppv.tmp %>%
+  mutate(Gender_summary = ifelse(Gender==1,1,NA)) %>%
+  mutate(Gender_summary = ifelse(is.na(Gender_summary),ifelse(Gender==2, 2, Gender_summary), Gender_summary)) %>%
+  mutate(Gender_summary = ifelse(is.na(Gender_summary), 3, Gender_summary)) 
+# %>%
+#     select(ID, Gender, Gender_summary) %>%
+#     View()
+
+## Check
+ppv.tmp2 %>%
+  select(ID, Gender, Gender_summary) %>%
+    View()
+
+glimpse(ppv.tmp2)
+## OK
+
+## Set changes
+ppv <- ppv.tmp2
+
+## Clean up
+rm(ppv.tmp, ppv.tmp2)
+```
+
+
+
+
+## 2. *Age*: 
+
+### Check and change to numerical variable, or missing (for refused or invalid) 
+
+```{r Change Age to numeric}
+
+## Change to numeric
+ppv.tmp2 <- ppv.tmp %>%
+  mutate(Age_num = as.numeric(Age))
+
+## Check
+ppv.tmp2 %>%
+  select(ID, Age, Age_num) %>%
+  arrange(desc(Age))
+## OK
+
+## Set change
+ppv.tmp <- ppv.tmp %>%
+  mutate(Age = as.numeric(Age))
+
+ppv.tmp %>%
+  select(ID, Age) %>%
+  arrange(desc(Age))
+## OK
+
+## Set
+ppv <- ppv.tmp
+
+## Clean up
+rm(ppv.tmp, ppv.tmp2)
+```
+
+Check age entries that are less than 10 or greater than 80.
+These will be flagged in a new variable *Age_query*.
+```{r Check Age values}
+## Test data
+ppv.tmp <- ppv
+
+## List and count ages
+ppv.tmp %>%
+  select(Age) %>%
+  group_by(Age) %>%
+  summarise(count=n()) %>%
+  View()
+
+## Query low and high ages
+ppv.tmp %>%
+  select(ID, Age, Household) %>%
+  filter(Age<10 | Age>80) %>%
+  arrange(desc(Age)) %>%
+  kable()
+```
+There are 35 responses with Age less than 10 or greater than 80.
+
+Create Age_query variable. Where 1 = ages less than 10 and greater than 80.
+```{r Create Age_query}
+## Create Age_query
+ppv.tmp <- ppv.tmp %>%
+  mutate(Age_query = ifelse(Age<10 | Age>80, 1, NA))
+
+## Check
+ppv.tmp %>%
+  select(ID, Age, Age_query) %>%
+  View()
+## OK
+
+## Set changes
+ppv <- ppv.tmp
+
+## Clean up
+rm(ppv.tmp)
+```
+
+### Create new variable for different age categories, suggest under 25, 25-34, 35-44, 45-54, 55-64, 65+
+
+
+new *Age_cat* variable sumamry:
+
+| Age-range | Age_cat value |
+|:----------|:--------------|
+|under 25   |1              |
+|25-34      |2              |
+|35-44      |3              |
+|45-54      |4              |
+|55-64      |5              |
+|65+        |6              |
+
+```{r Age categories}
+## Test data
+ppv.tmp <- ppv
+
+## Create variable
+ppv.tmp2 <- ppv.tmp %>%
+  mutate(Age_cat = ifelse(Age<25, 1, NA)) %>%
+  mutate(Age_cat = ifelse(is.na(Age_cat), ifelse(Age>=25 & Age<=34, 2, Age_cat), Age_cat)) %>%
+  mutate(Age_cat = ifelse(is.na(Age_cat), ifelse(Age>=35 & Age<=44, 3, Age_cat), Age_cat)) %>%
+  mutate(Age_cat = ifelse(is.na(Age_cat), ifelse(Age>=45 & Age<=54, 4, Age_cat), Age_cat)) %>%
+  mutate(Age_cat = ifelse(is.na(Age_cat), ifelse(Age>=55 & Age<=64, 5, Age_cat), Age_cat)) %>%
+  mutate(Age_cat = ifelse(is.na(Age_cat), ifelse(Age>=65, 6, Age_cat), Age_cat)) 
+# %>%
+#   select(ID, Age, Age_cat) %>%
+#   sample_n(500) %>%
+#   View()
+
+## Check
+ppv.tmp2 %>%
+  select(ID, Age, Age_cat) %>%
+  sample_n(500) %>%
+  View()
+## OK
+
+## Set changes
+ppv <- ppv.tmp2
+
+## Clean up
+rm(ppv.tmp, ppv.tmp2)
+```
+
+## 3. *Ethnicity*: Create new variable that is white/BAME or missing/refused
+
+New *Ethnicity_cat* variable comparison with *Ethnicity*:
+
+| *Ethnicity* | *Ethnicity* value | *Ethnicity_cat* value |
+|:---------------|:--------------|:----------------------|
+|White                |1           |1              |
+|Mixed ethnic group    |2          |1               |
+|Asian or Asian British|3         |1               |
+|Black or Black British|4         |1              |
+|Any other ethnic group|5          |1              |
+|Prefer not to say    |6           |2               |
+|*Missing*            |-99         |2               |
+|NA                   |NA         |2               |
+
+
+```{r Scope Ethnicity}
+## Test data
+ppv.tmp <- ppv
+
+## List and count ages
+ppv.tmp %>%
+  select(Ethnicity) %>%
+  group_by(Ethnicity) %>%
+  summarise(count=n()) %>%
+  View()
+
+```
+
+
+```{r Create Ethnicity_cat variable}
+ppv.tmp2 <- ppv.tmp %>%
+  mutate(Ethnicity_cat = ifelse(Ethnicity>=1 & Ethnicity<=5, 1, NA)) %>%
+  mutate(Ethnicity_cat = ifelse(is.na(Ethnicity_cat), ifelse(Ethnicity==6 | Ethnicity==-99, 2, Ethnicity_cat), Ethnicity_cat)) %>%
+  mutate(Ethnicity_cat = ifelse(is.na(Ethnicity_cat), 2, Ethnicity_cat))
+# %>%
+#   View()
+
+## Check
+ppv.tmp2 %>%
+  select(ID, Ethnicity, Ethnicity_cat) %>%
+  sample_n(450) %>%
+  View()
+
+## Set changes
+ppv <- ppv.tmp2
+
+## Clean up
+rm(ppv.tmp2, ppv.tmp)
+```
+
+
+## 4. *Disability*: Change 'prefer not to say' to user-missing
+
+Change *Disability*=6 to -99.
+```{r Change Disability value}
+##Test data
+ppv.tmp <- ppv
+
+## Scope dataset
+ppv.tmp %>%
+  select(Disability) %>%
+  filter(Disability==6) %>%
+  View()
+## There are 136 Disability=6 entries
+
+## Change Disability=6 to -99
+ppv.tmp2 <- ppv.tmp %>%
+  mutate(Disability = ifelse(Disability==6, -99, Disability))
+# %>%
+#   select(ID, Disability, Disability_new) %>%
+#   View()
+
+## Check
+ppv.tmp2 %>%
+  select(ID, Disability) %>%
+  View()
+## OK
+
+## Set changes
+ppv <- ppv.tmp2
+
+## Clean up
+rm(ppv.tmp2, ppv.tmp)
+```
+
+
+## 5. *Disability_oth*: Check and recode if necessary before creating new single variable
+
+```{r Check Disability_oth values}
+
+ppv.tmp <- ppv
+
+ppv.dis <- ppv.tmp %>%
+  select(ID, Disability_othtxt) %>%
+  mutate(Disability_reassign = 0) %>%
+  na.omit(Disability_othtxt) %>%
+  arrange(ID)
+
+```
+There are 89 entries of different 'other' disabilities.
+
+Attempt to assign *Disability_othtxt* entries to one of seven other *Disability_?* variables:
+
+* Disability_mob
+* Disability_age
+* Disability_VI
+* Disability_HI
+* Disability_LD
+* Disability_MH
+* Disability_LTI
+
+A new variable *Disability_reassign* will be created to contain a text strings of the name of the other *Disability_?* variable that seems to be appropriate. This will allow the choices to be vetted and confirmed.
+
+Summary of major disability groups from *Disability_othtxt*
+```{r Interrogate and summarise}
+
+ppv.dis %>%
+  mutate(Disabil_grp = ifelse(grepl("Autis|autism", Disability_othtxt), "Autism", NA)) %>%
+  mutate(Disabil_grp = ifelse(grepl("Asthma|asthma|breath|Breath", Disability_othtxt), "Asthma", Disabil_grp)) %>%
+  mutate(Disabil_grp = ifelse(grepl("Heart|heart", Disability_othtxt), "Heart", Disabil_grp)) %>%
+  mutate(Disabil_grp = ifelse(grepl("Diabet|diabet", Disability_othtxt), "Diabetes", Disabil_grp)) %>%
+  mutate(Disabil_grp = ifelse(grepl("Arth|arth", Disability_othtxt), "Arthritis", Disabil_grp)) %>%
+  group_by(Disabil_grp) %>%
+  na.omit(Disabil_grp) %>%
+  summarise(count=n()) %>%
+  arrange(desc(count)) %>%
+  kable(title="Some major groupings 'other' disability conditions", col.names=c("Disability group","count"))
+```
+Other text descriptions will be reassigned to *Disability_reassign* on an ad hoc basis as set out in the code below through listing the response IDs involved.
+
+```{r Assign Disability_othtext to Disability_reassign, include=FALSE}
+## Working dataset
+ppv.dis.re <- ppv.dis
+
+## Query Disability_othtxt entries
+ppv.dis.re %>%
+  # filter(grepl("Autis|autism", Disability_othtxt)) 
+  # slice(81:89) %>%
+  View()
+
+## Assign entries to existing options
+ppv.dis.re <- ppv.dis.re %>%
+  mutate(Disability_reassign = ifelse(grepl("Autis|autism", Disability_othtxt), "Disability_MH", NA)) %>%
+  mutate(Disability_reassign = ifelse(grepl("Asthma|asthma|breath|Breath", Disability_othtxt), "Disability_LTI", Disability_reassign)) %>%
+  mutate(Disability_reassign = ifelse(grepl("Heart|heart", Disability_othtxt), "Disability_LTI", Disability_reassign)) %>%
+  mutate(Disability_reassign = ifelse(grepl("Diabet|diabet", Disability_othtxt), "Disability_LTI", Disability_reassign)) %>%
+  mutate(Disability_reassign = ifelse(grepl("Arth|arth", Disability_othtxt), "Disability_mob", Disability_reassign)) %>%
+  mutate(Disability_reassign = ifelse(ID %in% c(32,422,829,882,1251,1304,1394,1417,1550,1645,1645,1654,2366,2371,2396,2599,2774,3964,4063,4083,4136,4222,4765,4961,5088), "Disability_LTI", Disability_reassign)) %>%
+  mutate(Disability_reassign = ifelse(ID %in% c(634,718,862,1140,1606,2026,2317,4025,4650,4736,4774,5111,5317), "Disability_mob", Disability_reassign)) %>%
+  mutate(Disability_reassign = ifelse(ID %in% c(1033,4561), "Disability_age", Disability_reassign)) %>%
+  mutate(Disability_reassign = ifelse(ID %in% c(1223,4626,4322), "Disability_MH", Disability_reassign))
+
+## Check missing
+ppv.dis.re %>%
+  # filter(!is.na(Disability_reassign)) %>%
+  filter(is.na(Disability_reassign) & !is.na(Disability_othtxt)) %>%
+  View()
+## All but one filled
+```
+All but one entry was reassigned: response ID 2703 *Disability_othtxt* was '...'.
+
+
+
+```{r Add Disability_reassign to dataset}
+## Make changes
+ppv.tmp2 <- ppv.dis.re %>%
+  select(-Disability_othtxt) %>%
+  right_join(ppv.tmp, "ID")
+
+## Check changes
+ppv.tmp2 %>%
+  select(ID, Disability_reassign, Disability, Disability_othtxt) %>%
+  View()
+
+glimpse(ppv.tmp2)
+## OK
+
+## Set changes
+ppv <- ppv.tmp2
+
+## Clean up
+rm(ppv.tmp2, ppv.tmp, ppv.dis, ppv.dis.re)
+```
+
+Employing strings as variables in *Disability_reassign* is not consistent with other variables in the dataset. The strings will here be changed to the following numerical values:
+
+|Value      |Label      |
+|:----------|:-----------|
+|1          |Disability_MH|
+|2          |Disability_LTI|
+|3          |Disability_mob|
+|4          |Disability_age|
+|5          |Disability_othtxt|
+
+```{r Disability_reassign with Value:Label pairs}
+
+ppv.tmp <- ppv
+
+ppv.tmp2 <- ppv.tmp %>%
+  mutate(Disability_reassign = ifelse(Disability_reassign=="Disability_MH",1,Disability_reassign)) %>%
+  mutate(Disability_reassign = ifelse(Disability_reassign=="Disability_LTI",2,Disability_reassign)) %>%
+  mutate(Disability_reassign = ifelse(Disability_reassign=="Disability_mob",3,Disability_reassign)) %>%
+  mutate(Disability_reassign = ifelse(Disability_reassign=="Disability_age",4,Disability_reassign)) %>%
+  mutate(Disability_reassign = ifelse(ID==2703,5,Disability_reassign))
+
+## Check
+ppv.tmp2 %>%
+  select(ID, Disability_reassign) %>%
+  group_by(Disability_reassign) %>%
+  summarise(count=n())
+## OK
+
+## Set changes
+ppv <- ppv.tmp2
+
+rm(ppv.tmp, ppv.tmp2)
+
+```
+
+
+
+
+

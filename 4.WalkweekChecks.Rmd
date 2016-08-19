@@ -1,0 +1,249 @@
+---
+title: "Walkweek consistency checks."
+author: "Mark Ruddy"
+date: "8th July 2016"
+output: html_document
+---
+
+```{r Load packages, include=FALSE}
+library(dplyr)
+library(tidyr)
+library(stringr)
+```
+
+```{r Load data}
+load("~/Documents/Personal/Work/DataScience/PeopleAndPlaces/Data/pp.data.RData")
+
+dim(pp)
+```
+
+# Walkweek Tasks
+
+1. Check that Walkweek only zero if other trip indicator variables agree (could be zero by default in survey).
+2. Create new variable flagging up inconsistencies.
+
+Need to compare Walkweek with other indicators of walking in last week:
+
+* MinsWalking
+* Diary1walk, Diary2walk, Diary3walk, Diary4walk, Diary5walk, Diary6walk, Diary7walk
+* Walk1min, Walk2min, Walk3min, Walk4min, Walk5min, Walk6min, Walk7min
+
+
+## Walkweek 'refused' check
+
+Are any Walkweek entries entered as 'refused', other strings or NA?
+
+```{r Walkweek entries}
+## Check 'refused' responses - should just be 0 or 1
+distinct(select(pp, Walkweek))
+```
+
+There are no 'refused' entries in Walkweek. All coded as 0 or 1.
+
+
+## Walkweek=0 and Diary?walk=1 check.
+
+Where Walkweek=0, are there any walking diary entries that are 1 (Diary?walk=1).
+
+```{r NO Walkweek but YES Diary?walk}
+## Check dimensions of Walkweek=0 & Diary?walk=1
+ppv %>%
+  filter(Walkweek==0 | is.na(Walkweek), Diary1walk==1 | Diary2walk==1 | Diary3walk==1 | Diary4walk==1 | Diary5walk==1 | Diary6walk==1 | Diary7walk==1) %>%
+  select(ID, Walkweek, Diary1walk, Diary2walk, Diary3walk, Diary4walk, Diary5walk, Diary6walk, Diary7walk) %>%
+  View()
+```
+There are 151 records where Walkweek=0 or is NA that have an associated walking diary entry.
+
+
+Add 'noWalkweek_yesDiary' variable flagging these.
+```{r Add noWalkweek_yesDiary variable}
+## Add flagging variable
+ppv <- ppv %>%
+  mutate(noWalkweek_yesDiary = ifelse((Walkweek==0 | is.na(Walkweek)) & (Diary1walk==1 | Diary2walk==1 | Diary3walk==1 | Diary4walk==1 | Diary5walk==1 | Diary6walk==1 | Diary7walk==1), 1, NA))
+
+## Check new variable
+ppv %>%
+  filter(Walkweek==0, Diary1walk==1 | Diary2walk==1 | Diary3walk==1 | Diary4walk==1 | Diary5walk==1 | Diary6walk==1 | Diary7walk==1) %>%
+  select(ID, noWalkweek_yesDiary, Walkweek, Diary1walk) %>%
+  View()
+```
+
+## Walkweek=1 and Diary?walk=0 check.
+
+Where Walkweek=1 are there any walking diary entries that are zero (Diary?walk=0).
+```{r YES Walkweek but NO Diary?walk}
+ppv %>%
+  filter(Walkweek==1, (Diary1walk==0 | is.na(Diary1walk)) & (Diary2walk==0 | is.na(Diary2walk)) & (Diary3walk==0 | is.na(Diary3walk)) & (Diary4walk==0 | is.na(Diary4walk)) & (Diary5walk==0 | is.na(Diary5walk)) & (Diary6walk==0 | is.na(Diary6walk)) & (Diary7walk==0 | is.na(Diary7walk))) %>%
+  select(ID, Walkweek, Diary1walk, Diary2walk, Diary3walk, Diary4walk, Diary5walk, Diary6walk, Diary7walk) %>%
+  View()
+```
+There are zero records where Walkweek=1 and no walking diary entry.
+
+
+## Walkweek and MinsWalking variable check.
+
+What variables have been entered in MinsWalking (Walking minutes during last week). This should just be numeric but are there NAs or letters?
+
+
+```{r MinsWalking entries}
+## Check for NAs
+ppv %>%
+  filter(is.na(MinsWalking)) %>%
+  select(ID, Walkweek, MinsWalking, Walk1min:Walk7min)
+## No NAs
+
+## Check for letters in MinsWalking responses - should just be numbers
+## ref http://stackoverflow.com/a/21629102 to get character vector from tbl_df
+mc <- collect(select(pp,MinsWalking))[[1]]
+
+pattern <- "[A-z]"
+
+mc[str_detect(mc, pattern)]
+
+rm(mc, pattern)
+```
+No NAs or letter in MinsWalking.
+
+
+## Walkweek=0 and MinsWalking>0 check.
+
+Are there instances of Walkweek=0 & MinsWalking>0?
+```{r NO Walkweek but YES MinsWalking}
+pp %>%
+  filter(Walkweek==0 | is.na(Walkweek), MinsWalking>0) %>%
+  dim()
+```
+There are zero records of Walkweek=0 with MinsWalking>0.
+
+## Walkweek=1 and MinsWalking=0 or NA check.
+
+Are there instances of Walkweek=1 with MinsWalk=0 or NA?
+```{r YES Walkweek but NO MinsWalking}
+pp %>%
+  filter(Walkweek==1, MinsWalking==0 | is.na(MinsWalking)) %>%
+  select(ID, Walkweek, MinsWalking) %>%
+  View()
+```
+There are 31 records of Walkweek=1 and MinsWalk=0.
+
+Add 'yesWalkweek_noMinsWalking' variable flagging these.
+```{r Add yesWalkweek_noMinsWalking variable}
+
+ppv <- ppv %>%
+  mutate(yesWalkweek_noMinsWalking = ifelse(Walkweek==1 & (MinsWalking==0 | is.na(MinsWalking)), 1, NA))
+
+ppv %>%
+  select(ID, yesWalkweek_noMinsWalking, Walkweek, MinsWalking) %>%
+  filter(yesWalkweek_noMinsWalking==1) %>%
+  View()
+
+## Save data
+#save.image("~/Documents/Personal/Work/DataScience/PeopleAndPlaces/Data/pp.data.RData")
+
+```
+
+
+
+## Walkweek and Walk?min variable check.
+
+Check that where Walkweek=0 doesn't have any Walk?min entries.
+```{r Walkweek and Walk?min NA check}
+## Check Walkweek==0 but Walk?min... are not NA
+ppv %>%
+  select(ID, Walkweek, Walk1min:Walk7min) %>%
+  filter(Walkweek==0, !is.na(Walk1min) | !is.na(Walk2min) | !is.na(Walk3min) | !is.na(Walk4min) | !is.na(Walk5min) | !is.na(Walk6min) | !is.na(Walk7min)) %>%
+  View()
+```
+No Walk?min entries with Walkweek=0.
+
+
+## Walkweek=1 and Walk?min=0 or NA check.
+Where Walkweek=1, are there NA entries to walking minutes per day (Walk?min) variables?
+```{r YES Walkweek but NO Walk?min}
+ppv %>%
+  select(ID, Walkweek, Walk1min:Walk7min) %>%
+  filter(Walkweek==1, (is.na(Walk1min) | Walk1min==0) & (is.na(Walk2min) | Walk2min==0) & (is.na(Walk3min) | Walk3min==0) & (is.na(Walk4min) | Walk4min==0) & (is.na(Walk5min) | Walk5min==0) & (is.na(Walk6min) | Walk6min==0) & (is.na(Walk7min) | Walk7min==0)) %>%
+  View()
+
+## 31 records
+```
+There are 31 instances of Walkweek=1 with NA or 0 values for walking minutes.
+
+
+Add 'yesWalkweek_noWalkmins' variable flagging these.
+```{r Add yesWalkweek_noWalkmins variable}
+## Add flagging variable
+ppv <- ppv %>%
+  mutate(yesWalkweek_noWalkmins = ifelse(Walkweek==1 & (is.na(Walk1min) | Walk1min==0) & (is.na(Walk2min) | Walk2min==0) & (is.na(Walk3min) | Walk3min==0) & (is.na(Walk4min) | Walk4min==0) & (is.na(Walk5min) | Walk5min==0) & (is.na(Walk6min) | Walk6min==0) & (is.na(Walk7min) | Walk7min==0), 1, NA))
+
+ppv %>%
+  select(ID, yesWalkweek_noWalkmins, Walkweek, Walk1min) %>%
+  filter(yesWalkweek_noWalkmins == 1) %>%
+  View()
+```
+
+? are yesWalkweek_noWalkmins the same records as yesWalkweek_noMinsWalking records?
+```{r Join by ID}
+ppv.MinsWalk <- ppv %>%
+  select(ID, yesWalkweek_noMinsWalking) %>%
+  filter(yesWalkweek_noMinsWalking==1) %>%
+  mutate(type = "MinsWalk")
+
+ppv.Walkmin <- ppv %>%
+  select(ID, yesWalkweek_noWalkmins) %>%
+  filter(yesWalkweek_noWalkmins==1) %>%
+  mutate(type = "Walkmins")
+
+join <- inner_join(ppv.Walkmin, ppv.MinsWalk, by="ID")
+  
+View(join)
+
+## Yes they are the same
+
+#rm(join, ppv.Walkmin, ppv.MinsWalk)
+```
+
+## Combine yesWalkweek_noMinsWalking and yesWalkweek_noWalkmins
+
+As the combination of Walkweek=1 and Walk?mins=0 or NA, and Walkweek=1 and MinsWalking=0 or NA, yield the same records, they can be combined together into the same flagging variable.
+
+```{r Combine yesWalkweek_noMinsWalking and yesWalkweek_noWalkmins}
+## Remove yesWalkweek_noMinsWalking and rename yesWalkweek_noWalkmins variables
+ppv <- ppv %>%
+  select(-yesWalkweek_noMinsWalking) %>%
+  rename(yesWalkweek_noMins = yesWalkweek_noWalkmins)
+
+ppv %>%
+  filter(yesWalkweek_noMins==1) %>%
+  select(ID, Cycleweek, yesWalkweek_noMins, MinsWalking, Walk1min) %>%
+  View()
+```
+
+## Walkweek=0 and Walk?min=1 check.
+```{r NO Walkweek and YES Walk?min}
+# Check Walkweek==0 but Walk?min... are not zero
+ppv %>%
+  select(ID, Walkweek, Walk1min:Walk7min) %>%
+  filter((Walkweek==0 | is.na(Walkweek)), Walk1min>0 & Walk2min>0 & Walk3min>0 & Walk4min>0 & Walk5min>0 & Walk6min>0 & Walk7min>0) %>%
+  dim()
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

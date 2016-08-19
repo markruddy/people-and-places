@@ -1,0 +1,812 @@
+---
+title: "SPSS value labels"
+author: "Mark Ruddy"
+date: "2 August 2016"
+output: html_document
+---
+
+## Task
+
+Compile list of variable names, their values and value labels.
+
+Then format them in the manner:
+
+VARNAME1 ADD VALUE LABELS 1 "Strongly Agree or Agree" 2 "Disagree or Strongly Disagree”.
+VARNAME2 ADD VALUE LABELS 1 “Male" 2 “Female”.
+VARNAME3 ADD VALUE LABELS 1 “Cycle" 2 “Not cycle”.
+
+
+## Compile list of variable names, their values and value labels.
+
+### New variables created during checks
+
+```{r Create data frame of variables values and labels.}
+varname <- rep(c("Household"),6)
+values <- c(1,2,3,4,5,6)
+text <- c("Single adult living alone",
+"Single adult living with other adults", "A couple without children", "A couple with children", "Other", "Single adult living with children")
+
+labels.df <- data.frame(varname, values, text)
+
+labels.df
+
+## Clean up
+# rm(varname, values, text)
+```
+
+```{r Existing variables their values and value names}
+## Cancyc
+
+varname <- rep("Cancyc",4)
+values <- c(1,2,3,4)
+text <- c("Yes", "No - physically unable to cycle", "No - don't know how/haven't learnt", "Refused to answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+## Cyc12mon
+varname <- rep("Cyc12mon",2)
+values <- c(1,2)
+text <- c("Yes", "No")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+## Cycmonth
+varname <- rep("Cycmonth",2)
+values <- c(1,2)
+text <- c("Yes", "No")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Other_ad_cyc2
+varname <- rep("Other_ad_cyc2",4)
+values <- c(1,2,3,4)
+text <- c("Yes", "No", "Don't know", "Refused to answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## HH_child_cyc
+varname <- rep("HH_child_cyc",4)
+values <- c(1,2,3,4)
+text <- c("Yes, often", "Yes, occasionally", "Never", "Refused to answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Commutes
+varname <- rep("Commutes",3)
+values <- c(1,2,3)
+text <- c("Yes", "No", "Refused to answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Commcar
+varname <- rep("Commcar",4)
+values <- c(1,2,3,4)
+text <- c("Always", "Usually", "Occasionally", "Rarely or never")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## CommPT
+varname <- rep("CommPT",4)
+values <- c(1,2,3,4)
+text <- c("Always", "Usually", "Occasionally", "Rarely or never")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Commcyc
+varname <- rep("Commcyc",4)
+values <- c(1,2,3,4)
+text <- c("Always", "Usually", "Occasionally", "Rarely or never")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Commwalk
+varname <- rep("Commwalk",4)
+values <- c(1,2,3,4)
+text <- c("Always", "Usually", "Occasionally", "Rarely or never")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Escorts
+varname <- rep("Escorts",3)
+values <- c(1,2,3)
+text <- c("Yes", "No", "Refused to answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Esccar
+varname <- rep("Esccar",4)
+values <- c(1,2,3,4)
+text <- c("Always", "Usually", "Occasionally", "Rarely or never")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## EscPT
+varname <- rep("EscPT",4)
+values <- c(1,2,3,4)
+text <- c("Always", "Usually", "Occasionally", "Rarely or never")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Esccyc
+varname <- rep("Esccyc",4)
+values <- c(1,2,3,4)
+text <- c("Always", "Usually", "Occasionally", "Rarely or never")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Escwalk
+varname <- rep("Escwalk",4)
+values <- c(1,2,3,4)
+text <- c("Always", "Usually", "Occasionally", "Rarely or never")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Food
+varname <- rep("Food",3)
+values <- c(1,2,3)
+text <- c("Yes", "No", "Refused to answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Foodwalk
+varname <- rep("Foodwalk",4)
+values <- c(1,2,3,4)
+text <- c("Always", "Usually", "Occasionally", "Rarely or never")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## FoodPT
+varname <- rep("FoodPT",4)
+values <- c(1,2,3,4)
+text <- c("Always", "Usually", "Occasionally", "Rarely or never")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Foodcyc
+varname <- rep("Foodcyc",4)
+values <- c(1,2,3,4)
+text <- c("Always", "Usually", "Occasionally", "Rarely or never")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Foodwalk
+varname <- rep("Foodcyc",4)
+values <- c(1,2,3,4)
+text <- c("Always", "Usually", "Occasionally", "Rarely or never")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Foodwalk
+varname <- rep("Foodcyc",4)
+values <- c(1,2,3,4)
+text <- c("Always", "Usually", "Occasionally", "Rarely or never")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Friends
+varname <- rep("Friends",3)
+values <- c(1,2,3)
+text <- c("Yes", "No", "Refused to answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Friendcar
+varname <- rep("Friendcar",4)
+values <- c(1,2,3,4)
+text <- c("Always", "Usually", "Occasionally", "Rarely or never")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## FriendPT
+varname <- rep("FriendPT",4)
+values <- c(1,2,3,4)
+text <- c("Always", "Usually", "Occasionally", "Rarely or never")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Friendcyc
+varname <- rep("Friendcyc",4)
+values <- c(1,2,3,4)
+text <- c("Always", "Usually", "Occasionally", "Rarely or never")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Friendwalk
+varname <- rep("Friendwalk",4)
+values <- c(1,2,3,4)
+text <- c("Always", "Usually", "Occasionally", "Rarely or never")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Prefwalk
+varname <- rep("Prefwalk",6)
+values <- c(1,2,3,4,5,6)
+text <- c("I use this and it is my preferred method of travel", "This is one of several methods I am happy to use", "I use this method but would prefer not to", "I would like to use this method, but currently don't", "I don't use this method and prefer not to", "Refused to answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Prefcyc
+varname <- rep("Prefcyc",6)
+values <- c(1,2,3,4,5,6)
+text <- c("I use this and it is my preferred method of travel", "This is one of several methods I am happy to use", "I use this method but would prefer not to", "I would like to use this method, but currently don't", "I don't use this method and prefer not to", "Refused to answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Prefbus
+varname <- rep("Prefbus",6)
+values <- c(1,2,3,4,5,6)
+text <- c("I use this and it is my preferred method of travel", "This is one of several methods I am happy to use", "I use this method but would prefer not to", "I would like to use this method, but currently don't", "I don't use this method and prefer not to", "Refused to answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Preftrain
+varname <- rep("Preftrain",6)
+values <- c(1,2,3,4,5,6)
+text <- c("I use this and it is my preferred method of travel", "This is one of several methods I am happy to use", "I use this method but would prefer not to", "I would like to use this method, but currently don't", "I don't use this method and prefer not to", "Refused to answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Preftube
+varname <- rep("Preftube",6)
+values <- c(1,2,3,4,5,6)
+text <- c("I use this and it is my preferred method of travel", "This is one of several methods I am happy to use", "I use this method but would prefer not to", "I would like to use this method, but currently don't", "I don't use this method and prefer not to", "Refused to answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Prefcar
+varname <- rep("Prefcar",6)
+values <- c(1,2,3,4,5,6)
+text <- c("I use this and it is my preferred method of travel", "This is one of several methods I am happy to use", "I use this method but would prefer not to", "I would like to use this method, but currently don't", "I don't use this method and prefer not to", "Refused to answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Suppwalk
+varname <- rep("Suppwalk",5)
+values <- c(2,3,4,6,7)
+text <- c("Too little", "About the right amount", "Too much", "Don't know or not applicable", "Refused to know")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Suppcyc
+varname <- rep("Suppcyc",5)
+values <- c(2,3,4,6,7)
+text <- c("Too little", "About the right amount", "Too much", "Don't know or not applicable", "Refused to know")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Suppbus
+varname <- rep("Suppbus",5)
+values <- c(2,3,4,6,7)
+text <- c("Too little", "About the right amount", "Too much", "Don't know or not applicable", "Refused to know")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Supptrain
+varname <- rep("Supptrain",5)
+values <- c(2,3,4,6,7)
+text <- c("Too little", "About the right amount", "Too much", "Don't know or not applicable", "Refused to know")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Supptube
+varname <- rep("Supptube",5)
+values <- c(2,3,4,6,7)
+text <- c("Too little", "About the right amount", "Too much", "Don't know or not applicable", "Refused to know")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Suppcar
+varname <- rep("Suppcar",5)
+values <- c(2,3,4,6,7)
+text <- c("Too little", "About the right amount", "Too much", "Don't know or not applicable", "Refused to know")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_cyc_unsafe
+varname <- rep("Area_cyc_unsafe",6)
+values <- c(1,2,3,4,5,8)
+text <- c("Strongly Disagree", "Tend to Disagree", "Tend to Agree", "Strongly Agree", "Neither Agree nor Disagree", "Refused to Answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_cross
+varname <- rep("Area_cross",6)
+values <- c(1,2,3,4,5,8)
+text <- c("Strongly Disagree", "Tend to Disagree", "Tend to Agree", "Strongly Agree", "Neither Agree nor Disagree", "Refused to Answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_talk
+varname <- rep("Area_talk",6)
+values <- c(1,2,3,4,5,8)
+text <- c("Strongly Disagree", "Tend to Disagree", "Tend to Agree", "Strongly Agree", "Neither Agree nor Disagree", "Refused to Answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_8yo_walk
+varname <- rep("Area_8yo_walk",6)
+values <- c(1,2,3,4,5,8)
+text <- c("Strongly Disagree", "Tend to Disagree", "Tend to Agree", "Strongly Agree", "Neither Agree nor Disagree", "Refused to Answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_stop
+varname <- rep("Area_stop",6)
+values <- c(1,2,3,4,5,8)
+text <- c("Strongly Disagree", "Tend to Disagree", "Tend to Agree", "Strongly Agree", "Neither Agree nor Disagree", "Refused to Answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_crime
+varname <- rep("Area_crime",6)
+values <- c(1,2,3,4,5,8)
+text <- c("Strongly Disagree", "Tend to Disagree", "Tend to Agree", "Strongly Agree", "Neither Agree nor Disagree", "Refused to Answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_cyc_path
+varname <- rep("Area_cyc_path",6)
+values <- c(1,2,3,4,5,8)
+text <- c("Strongly Disagree", "Tend to Disagree", "Tend to Agree", "Strongly Agree", "Neither Agree nor Disagree", "Refused to Answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_walk_pleas
+varname <- rep("Area_walk_pleas",6)
+values <- c(1,2,3,4,5,8)
+text <- c("Strongly Disagree", "Tend to Disagree", "Tend to Agree", "Strongly Agree", "Neither Agree nor Disagree", "Refused to Answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_shade
+varname <- rep("Area_shade",6)
+values <- c(1,2,3,4,5,8)
+text <- c("Strongly Disagree", "Tend to Disagree", "Tend to Agree", "Strongly Agree", "Neither Agree nor Disagree", "Refused to Answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_airpoll
+varname <- rep("Area_airpoll",6)
+values <- c(1,2,3,4,5,8)
+text <- c("Strongly Disagree", "Tend to Disagree", "Tend to Agree", "Strongly Agree", "Neither Agree nor Disagree", "Refused to Answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_cyc_pleas
+varname <- rep("Area_cyc_pleas",6)
+values <- c(1,2,3,4,5,8)
+text <- c("Strongly Disagree", "Tend to Disagree", "Tend to Agree", "Strongly Agree", "Neither Agree nor Disagree", "Refused to Answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_8yo_cyc
+varname <- rep("Area_8yo_cyc",6)
+values <- c(1,2,3,4,5,8)
+text <- c("Strongly Disagree", "Tend to Disagree", "Tend to Agree", "Strongly Agree", "Neither Agree nor Disagree", "Refused to Answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_facilities
+varname <- rep("Area_facilities",6)
+values <- c(1,2,3,4,5,8)
+text <- c("Strongly Disagree", "Tend to Disagree", "Tend to Agree", "Strongly Agree", "Neither Agree nor Disagree", "Refused to Answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_walk_unsafe
+varname <- rep("Area_walk_unsafe",6)
+values <- c(1,2,3,4,5,8)
+text <- c("Strongly Disagree", "Tend to Disagree", "Tend to Agree", "Strongly Agree", "Neither Agree nor Disagree", "Refused to Answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_pavements
+varname <- rep("Area_pavements",6)
+values <- c(1,2,3,4,5,8)
+text <- c("Strongly Disagree", "Tend to Disagree", "Tend to Agree", "Strongly Agree", "Neither Agree nor Disagree", "Refused to Answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Noise_home
+varname <- rep("Noise_home",6)
+values <- c(1,2,3,4,5,8)
+text <- c("Extremely", "Very", "Slightly", "Not at all", "Moderately", "Refused to answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Noise_area
+varname <- rep("Noise_area",6)
+values <- c(1,2,3,4,5,8)
+text <- c("Extremely", "Very", "Slightly", "Not at all", "Moderately", "Refused to answer")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Gender
+varname <- rep("Gender",4)
+values <- c(1,2,3,4)
+text <- c("Male", "Female", "Other, please state", "Prefer not to say")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Ethnicity
+varname <- rep("Ethnicity",6)
+values <- c(1,2,3,4,5,6)
+text <- c("White", "Mixed ethnic group", "Asian or Asian British", "Black or Black British", "Any other ethnic group", "Prefer not to say")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Disability
+varname <- rep("Disability",3)
+values <- c(4,5,6)
+text <- c("Yes", "No", "Prefer not to say")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## HH_income
+varname <- rep("HH_income",5)
+values <- c(1,2,3,4,5)
+text <- c("Under £20,000", "£20,000-£49,999", "£50,000-74,999", "Don't know / prefer not to say", "£75,000 or more")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Consent_nxt_yr
+varname <- rep("Consent_nxt_yr",2)
+values <- c(1,2)
+text <- c("Yes", "No")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## SurveyGp
+varname <- rep("SurveyGp",4)
+values <- c(1,2,3,4)
+text <- c("Leaflet", "Oyster database", "Cyclist database", "Unknown (Oyster or cyclist database, unmatched")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Borough
+varname <- rep("Borough",4)
+values <- c(1,2,3,4)
+text <- c("Enfield", "Kingston", "Waltham Forest", "Control")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+# labels.df %>% View()
+
+# varname <- rep()
+# values <- c()
+# text <- c()
+
+```
+
+
+
+```{r New variables their values and value names}
+
+
+## HH_text_code
+varname <- rep(c("HH_text_code"),6)
+values <- c(1,2,3,4,5,6)
+text <- c("Single adult living alone",
+"Single adult living with other adults", "A couple without children", "A couple with children", "Other", "Single adult living with children")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## HH_text_new
+varname <- rep(c("HH_text_new"),6)
+values <- c(1,2,3,4,5,6)
+text <- c("Single adult living alone",
+"Single adult living with other adults", "A couple without children", "A couple with children", "Other", "Single adult living with children")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## HH_num_age_dis
+varname <- rep(c("HH_num_age_dis"),2)
+values <- c(1,2)
+text <- c("Real disagreement", "Missing value disagreement")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## HH_carvan_sum
+varname <- rep(c("HH_carvan_sum"),3)
+values <- c(0,1,2)
+text <- c("No car", "One car", "Two or more cars")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_cyc_unsafe_AgDis
+varname <- rep(c("Area_cyc_unsafe_AgDis"),2)
+values <- c(1,2)
+text <- c("Disagree", "Agree")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+## Area_cross_AgDis
+varname <- rep(c("Area_cross_AgDis"),2)
+values <- c(1,2)
+text <- c("Disagree", "Agree")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_talk_AgDis
+varname <- rep(c("Area_talk_AgDis"),2)
+values <- c(1,2)
+text <- c("Disagree", "Agree")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_8yo_walk_AgDis
+varname <- rep(c("Area_8yo_walk_AgDis"),2)
+values <- c(1,2)
+text <- c("Disagree", "Agree")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_stop_AgDis
+varname <- rep(c("Area_stop_AgDis"),2)
+values <- c(1,2)
+text <- c("Disagree", "Agree")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_crime_AgDis
+varname <- rep(c("Area_crime_AgDis"),2)
+values <- c(1,2)
+text <- c("Disagree", "Agree")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_cyc_path_AgDis
+varname <- rep(c("Area_cyc_path_AgDis"),2)
+values <- c(1,2)
+text <- c("Disagree", "Agree")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_walk_pleas_AgDis
+varname <- rep(c("Area_walk_pleas_AgDis"),2)
+values <- c(1,2)
+text <- c("Disagree", "Agree")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_shade_AgDis
+varname <- rep(c("Area_shade_AgDis"),2)
+values <- c(1,2)
+text <- c("Disagree", "Agree")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_airpoll_AgDis
+varname <- rep(c("Area_airpoll_AgDis"),2)
+values <- c(1,2)
+text <- c("Disagree", "Agree")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_cyc_pleas_AgDis
+varname <- rep(c("Area_cyc_pleas_AgDis"),2)
+values <- c(1,2)
+text <- c("Disagree", "Agree")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_8yo_cyc_AgDis
+varname <- rep(c("Area_8yo_cyc_AgDis"),2)
+values <- c(1,2)
+text <- c("Disagree", "Agree")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_facilities_AgDis
+varname <- rep(c("Area_facilities_AgDis"),2)
+values <- c(1,2)
+text <- c("Disagree", "Agree")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_walk_unsafe_AgDis
+varname <- rep(c("Area_walk_unsafe_AgDis"),2)
+values <- c(1,2)
+text <- c("Disagree", "Agree")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Area_pavements_AgDis
+varname <- rep(c("Area_pavements_AgDis"),2)
+values <- c(1,2)
+text <- c("Disagree", "Agree")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+
+## Gender_summary
+varname <- rep(c("Gender_summary"),3)
+values <- c(1,2,3)
+text <- c("Male", "Female", "Other / Missing")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+
+## Age_cat
+varname <- rep(c("Age_cat"),6)
+values <- c(1,2,3,4,5,6)
+text <- c("Under 25", "25-34", "35-44", "45-54", "55-64", "65+")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Ethnicity_cat
+varname <- rep(c("Ethnicity_cat"),2)
+values <- c(1,2)
+text <- c("White / BAME", "Other / Missing")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+
+## Disability_reassign
+varname <- rep("Disability_reassign", 5)
+values <- c(1,2,3,4,5)
+text <- c("Disability_MH", "Disability_LTI", "Disability_mob", "Disability_age", "Disability_othtxt")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Phyact_qry
+varname <- rep("Phyact_qry", 2)
+values <- c(1,2)
+text <- c("Phyact < diary", "Phyact > diary")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Emp_paid
+varname <- rep("Emp_paid", 2)
+values <- c(1,2)
+text <- c("Paid employment", "Not in paid employment")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+## Emp_FT
+varname <- rep("Emp_FT", 2)
+values <- c(1,2)
+text <- c("Paid full-time employment", "Not in paid full-time employment")
+
+labels.df <- rbind(labels.df, data.frame(varname, values, text))
+
+
+# labels.df %>% View()
+# rm(varname, values, text)
+```
+
+## Code up SPSS syntax
+
+For each variable, compile statements in the format:
+
+VARNAME1 ADD VALUE LABELS 1 "Strongly Agree or Agree" 2 "Disagree or Strongly Disagree”.
+VARNAME2 ADD VALUE LABELS 1 “Male" 2 “Female”.
+VARNAME3 ADD VALUE LABELS 1 “Cycle" 2 “Not cycle”.
+
+```{r }
+
+l.df <- labels.df
+
+## Function to write SPSS syntax from labels data.frame
+SPSS.labels <- function(DF) {
+  syn.all <- NULL;
+  names <- as.character(unique(DF[[1]]));
+  for (i in 1:length(names)) {
+    syn.line <- NULL;
+    x <- names[i];
+    DFgrp <- DF[which(DF[1]==x),];
+    for (j in 1:dim(DFgrp)[1]) {
+      syn.frag <- paste0(" ", DFgrp[j,2], " \"", DFgrp[j,3],"\"", sep="");
+      syn.line <- paste0(syn.line, syn.frag, sep="");
+      }
+    syn.all <- paste0(syn.all, paste0(names[i], " ADD VALUE LABELS", syn.line, ".\n", sep=""), sep="");
+  }
+  return(syn.all);
+}
+
+
+spss.syntax <- SPSS.labels(l.df)
+setwd("/Users/markruddy/Documents/Personal/Work/DataScience/PeopleAndPlaces/")
+write(spss.syntax, file="./Working/Outputs/Code/spss_var_value_syntax.txt")
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

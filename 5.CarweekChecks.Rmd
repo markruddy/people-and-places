@@ -1,0 +1,244 @@
+---
+title: "Carweek consistency checks."
+author: "Mark Ruddy"
+date: "8th July 2016"
+output: html_document
+---
+
+```{r Load packages, include=FALSE}
+library(dplyr)
+library(tidyr)
+library(stringr)
+```
+
+```{r Load data}
+load("~/Documents/Personal/Work/DataScience/PeopleAndPlaces/Data/pp.data.RData")
+
+dim(pp)
+```
+
+# Carweek Tasks
+
+1. Check that Carweek only zero if other trip indicator variables agree (could be zero by default in survey).
+2. Create new variable flagging up inconsistencies.
+
+Need to compare Carweek with other indicators of driving in last week:
+
+* MinsCar
+* Diary1car, Diary2car, Diary3car, Diary4car, Diary5car, Diary6car, Diary7car
+* Car1min, Car2min, Car3min, Car4min, Car5min, Car6min, Car7min
+
+
+## Carweek 'refused' check
+
+Are any Carweek entries entered as 'refused', other strings or NA?
+
+```{r Carweek entries}
+## Check 'refused' responses - should just be 0 or 1
+distinct(select(pp, Carweek))
+```
+There are no 'refused' entries in Carweek. All coded as 0 or 1.
+
+
+## Carweek=0 and Diary?car=1 check.
+
+Where Carweek=0, are there any driving diary entries that are 1 (Diary?car=1).
+
+```{r NO Carweek but YES Diary?car}
+## Check dimensions of Carweek=0 & Diary?car=1
+ppv %>%
+  filter(Carweek==0 | is.na(Carweek), Diary1car==1 | Diary2car==1 | Diary3car==1 | Diary4car==1 | Diary5car==1 | Diary6car==1 | Diary7car==1) %>%
+  select(ID, Carweek, Diary1car, Diary2car, Diary3car, Diary4car, Diary5car, Diary6car, Diary7car) %>%
+  View()
+```
+There are 138 records where Carweek=0 or is NA that have an associated driving diary entry.
+
+
+Add 'noCarweek_yesDiary' variable flagging these.
+```{r Add noCarweek_yesDiary variable}
+## Add flagging variable
+ppv <- ppv %>%
+  mutate(noCarweek_yesDiary = ifelse((Carweek==0 | is.na(Carweek)) & (Diary1car==1 | Diary2car==1 | Diary3car==1 | Diary4car==1 | Diary5car==1 | Diary6car==1 | Diary7car==1), 1, NA))
+
+## Check new variable
+ppv %>%
+  filter(Carweek==0, Diary1car==1 | Diary2car==1 | Diary3car==1 | Diary4car==1 | Diary5car==1 | Diary6car==1 | Diary7car==1) %>%
+  select(ID, noCarweek_yesDiary, Carweek, Diary1car) %>%
+  View()
+```
+
+## Carweek=1 and Diary?car=0 check.
+
+Where Carweek=1 are there any driving diary entries that are zero (Diary?car=0).
+```{r YES Carweek but NO Diary?car}
+ppv %>%
+  filter(Carweek==1, (Diary1car==0 | is.na(Diary1car)) & (Diary2car==0 | is.na(Diary2car)) & (Diary3car==0 | is.na(Diary3car)) & (Diary4car==0 | is.na(Diary4car)) & (Diary5car==0 | is.na(Diary5car)) & (Diary6car==0 | is.na(Diary6car)) & (Diary7car==0 | is.na(Diary7car))) %>%
+  select(ID, Carweek, Diary1car, Diary2car, Diary3car, Diary4car, Diary5car, Diary6car, Diary7car) %>%
+  View()
+```
+There are zero records where Carweek=1 and no driving diary entry.
+
+
+## Carweek and MinsCar variable check.
+
+What variables have been entered in MinsCar (Car minutes during last week). This should just be numeric but are there NAs or letters?
+
+```{r MinsCar entries}
+## Check for NAs
+ppv %>%
+  filter(is.na(MinsCar)) %>%
+  select(ID, Carweek, MinsCar, Car1min:Car7min)
+## No NAs
+
+## Check for letters in MinsCar responses - should just be numbers
+## ref http://stackoverflow.com/a/21629102 to get character vector from tbl_df
+mc <- collect(select(pp,MinsCar))[[1]]
+
+pattern <- "[A-z]"
+
+mc[str_detect(mc, pattern)]
+
+rm(mc, pattern)
+```
+No NAs or letter in MinsCar.
+
+
+## Carweek=0 and MinsCar>0 check.
+
+Are there instances of Carweek=0 & MinsCar>0?
+```{r NO Carweek but YES MinsCar}
+pp %>%
+  filter(Carweek==0 | is.na(Carweek), MinsCar>0) %>%
+  dim()
+```
+There are zero records of Carweek=0 with MinsCar>0.
+
+## Carweek=1 and MinsCar=0 or NA check.
+
+Are there instances of Carweek=1 with MinsCar=0 or NA?
+```{r YES Carweek but NO MinsCar}
+pp %>%
+  filter(Carweek==1, MinsCar==0 | is.na(MinsCar)) %>%
+  select(ID, Carweek, MinsCar) %>%
+  View()
+```
+There are 36 records of Carweek=1 and MinsCar=0.
+
+Add 'yesCarweek_noMinsCar' variable flagging these.
+```{r Add yesCarweek_noMinsCar variable}
+ppv <- ppv %>%
+  mutate(yesCarweek_noMinsCar = ifelse(Carweek==1 & (MinsCar==0 | is.na(MinsCar)), 1, NA))
+
+ppv %>%
+  select(ID, yesCarweek_noMinsCar, Carweek, MinsCar) %>%
+  filter(yesCarweek_noMinsCar==1) %>%
+  View()
+
+## Save data
+#save.image("~/Documents/Personal/Work/DataScience/PeopleAndPlaces/Data/pp.data.RData")
+
+```
+
+## Carweek and Car?min variable check.
+
+Check that where Carweek=0 doesn't have any Car?min entries.
+```{r Carweek and Car?min NA check}
+## Check Carweek==0 but Car?min... are not NA
+ppv %>%
+  select(ID, Carweek, Car1min:Car7min) %>%
+  filter(Carweek==0, !is.na(Car1min) | !is.na(Car2min) | !is.na(Car3min) | !is.na(Car4min) | !is.na(Car5min) | !is.na(Car6min) | !is.na(Car7min)) %>%
+  View()
+```
+No Car?min entries with Carweek=0.
+
+
+## Carweek=1 and Car?min=0 or NA check.
+Where Carweek=1, are there NA entries to driving minutes per day (Car?min) variables?
+```{r YES Carweek but NO Car?min}
+ppv %>%
+  select(ID, Carweek, Car1min:Car7min) %>%
+  filter(Carweek==1, (is.na(Car1min) | Car1min==0) & (is.na(Car2min) | Car2min==0) & (is.na(Car3min) | Car3min==0) & (is.na(Car4min) | Car4min==0) & (is.na(Car5min) | Car5min==0) & (is.na(Car6min) | Car6min==0) & (is.na(Car7min) | Car7min==0)) %>%
+  View()
+
+## 36 records
+```
+There are 36 instances of Carweek=1 with NA or 0 values for driving minutes.
+
+
+Add 'yesCarweek_noCarmins' variable flagging these.
+```{r Add yesCarweek_noCarmins variable}
+## Add flagging variable
+ppv <- ppv %>%
+  mutate(yesCarweek_noCarmins = ifelse(Carweek==1 & (is.na(Car1min) | Car1min==0) & (is.na(Car2min) | Car2min==0) & (is.na(Car3min) | Car3min==0) & (is.na(Car4min) | Car4min==0) & (is.na(Car5min) | Car5min==0) & (is.na(Car6min) | Car6min==0) & (is.na(Car7min) | Car7min==0), 1, NA))
+
+ppv %>%
+  select(ID, yesCarweek_noCarmins, Carweek, Car1min) %>%
+  filter(yesCarweek_noCarmins == 1) %>%
+  View()
+```
+
+? are yesCarweek_noCarmins the same records as yesCarweek_noMinsCar records?
+```{r Join by ID}
+ppv.MinsCar <- ppv %>%
+  select(ID, yesCarweek_noMinsCar) %>%
+  filter(yesCarweek_noMinsCar==1) %>%
+  mutate(type = "MinsCar")
+
+ppv.Carmin <- ppv %>%
+  select(ID, yesCarweek_noCarmins) %>%
+  filter(yesCarweek_noCarmins==1) %>%
+  mutate(type = "Carmins")
+
+join <- inner_join(ppv.Carmin, ppv.MinsCar, by="ID")
+  
+View(join)
+
+## Yes they are the same
+
+#rm(join, ppv.Carmin, ppv.MinsCar)
+```
+
+## Combine yesCarweek_noMinsCar and yesCarweek_noCarmins
+
+As the combination of Carweek=1 and Car?mins=0 or NA, and Carweek=1 and MinsCar=0 or NA, yield the same records, they can be combined together into the same flagging variable.
+
+```{r Combine yesCarweek_noMinsCar and yesCarweek_noCarmins}
+## Remove yesCarweek_noMinsCar and rename yesCarweek_noCarmins variables
+ppv <- ppv %>%
+  select(-yesCarweek_noMinsCar) %>%
+  rename(yesCarweek_noMins = yesCarweek_noCarmins)
+
+ppv %>%
+  filter(yesCarweek_noMins==1) %>%
+  select(ID, Cycleweek, yesCarweek_noMins, MinsCar, Car1min) %>%
+  View()
+```
+
+## Carweek=0 and Car?min=1 check.
+```{r NO Carweek and YES Car?min}
+# Check Carweek==0 but Car?min... are not zero
+ppv %>%
+  select(ID, Carweek, Car1min:Car7min) %>%
+  filter((Carweek==0 | is.na(Carweek)), Car1min>0 & Car2min>0 & Car3min>0 & Car4min>0 & Car5min>0 & Car6min>0 & Car7min>0) %>%
+  dim()
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

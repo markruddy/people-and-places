@@ -1,0 +1,396 @@
+---
+title: "Empployment check and recode"
+author: "Mark Ruddy"
+date: "31 July 2016"
+output: html_document
+---
+
+
+Load libraries and data
+```{r Setup, include=FALSE}
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(knitr)
+library(ggplot2)
+# setwd("/Users/markruddy/Documents/Personal/Work/DataScience/PeopleAndPlaces/")
+# load("./Data/pp.data.RData")
+```
+
+
+## Tasks
+
+1. *Emp_other*: Check and recode if necessary before creating new variables.
+2. *Emp_FTwork*: Create new variables for: (a) paid employment or not; (b) full-time paid employment or not
+
+
+## 1. *Emp_other*: Check and recode if necessary before creating new variables.
+
+```{r Scope variable Emp_other}
+## Temp data
+ppv.tmp <- ppv
+
+ppv.emp <- ppv.tmp %>%
+  select(ID, Emp_othertxt, starts_with("Emp")) %>%
+  mutate(Emp_reassign = 0) %>%
+  na.omit(Emp_othertxt) %>%
+  arrange(ID)
+
+ppv.tmp %>%
+  select(Emp_other) %>%
+  filter(Emp_other==1) %>%
+  tally()
+## 128 Emp_other
+
+ppv.tmp %>%
+  select(Emp_othertxt) %>%
+  na.omit(Emp_othertxt) %>%
+  tally()
+## 117 Emp_othertxt
+```
+There are 128 entries in *Emp_other* and 117 *Emp_othertxt* entries.
+There are 117 entries of different 'other' employment.
+
+Some *Emp_other* entries also have other Employment variables chosen. 
+```{r Find Employment variables chosen alongside Emp_other}
+## Which Emp_other also have other Emp_ variables selected?
+
+ppv.tmp %>%
+  select(ID, Emp_othertxt, starts_with("Emp")) %>%
+  mutate(Emp_select = rowSums(.[,c(-1:-2,-12)], na.rm=T)) %>%
+  mutate(Emp_othplus = ifelse(Emp_other==1 & Emp_select>=1, 1, NA)) %>%
+  select(ID, Emp_othertxt, Emp_other, Emp_select, Emp_othplus) %>%
+  filter(Emp_select>=1 & Emp_other==1) %>%
+  arrange(ID) %>%
+  View()
+## 34 Emp_other also have other Emp_ variables selected
+
+## Dataset only of Emp_other responses that don't occur alongside other employment variable choices
+emp_oth_only <- ppv.tmp %>%
+  select(ID, Emp_othertxt, starts_with("Emp")) %>%
+  mutate(Emp_select = rowSums(.[,c(-1:-2,-12)], na.rm=T)) %>%
+  mutate(Emp_othplus = ifelse(Emp_other==1 & Emp_select>=1, 1, NA)) %>%
+  mutate(Emp_othertxtX = Emp_othertxt) %>%
+  filter(Emp_select>=1 & Emp_other==1) %>%
+  # filter(Emp_othplus==1) %>%
+  # select(ID) %>% ## , Emp_othertxt, Emp_other, Emp_select, Emp_othplus
+  # arrange(ID) %>%
+  # .$ID
+
+```
+There are 34 responses where *Emp_other* alongside other *Emp_...* variables have been selected (80, 255, 267, 309, 1135, 1140, 1251, 1403, 1517, 1554, 1575, 1841, 1931, 2008, 2047, 2096, 2201, 2430, 2445, 2530, 2983, 3655, 3681, 4041, 4074, 4213, 4386, 4448, 4466, 4567, 4638, 5014, 5150, 5214). Meaning 94 *Emp_other* entries need resolving. These IDs and *Emp_othertxtX* entries can be found in *Emp_oth_only*.
+
+
+Attempt to assign *Emp_othertxt* entries to one of seven other *Emp_?* variables:
+
+* Emp_FTwork
+* Emp_PTwork
+* Emp_FTstudy
+* Emp_PTstudy
+* Emp_looking
+* Emp_notlkg
+* Emp_retired
+* Emp_volwork
+* Emp_home
+
+A new variable *Emp_reassign* will be created to contain a text strings of the name of the other *Emp_?* variable that seems to be appropriate. This will allow the choices to be vetted and confirmed.
+
+
+### Summary of major employment groups from *Emp_othertxt*
+```{r Interrogate and summarise}
+
+emp_oth_only %>%
+  mutate(Emp_grp = ifelse(grepl("Self|self", Emp_othertxtX), "Self-employed", NA)) %>%
+  mutate(Emp_grp = ifelse(is.na(Emp_grp), ifelse(grepl("Maternity|maternity|Paternity|paternity", Emp_othertxtX), "Maternity/paternity leave", Emp_grp), Emp_grp)) %>%
+  mutate(Emp_grp = ifelse(is.na(Emp_grp), ifelse(grepl("Retire|retire", Emp_othertxtX), "Retired", Emp_grp), Emp_grp)) %>%
+  mutate(Emp_grp = ifelse(is.na(Emp_grp), ifelse(grepl("Carer|carer|CARER|House|house", Emp_othertxtX), "Family/home", Emp_grp), Emp_grp)) %>%
+  mutate(Emp_grp = ifelse(is.na(Emp_grp), ifelse(grepl("Volunt|volunt", Emp_othertxtX), "Volunteer", Emp_grp), Emp_grp)) %>%
+  select(ID, Emp_grp) %>% View()
+  group_by(Emp_grp) %>%
+  # na.omit(Emp_grp) %>%
+  summarise(count=n()) %>%
+  arrange(desc(count)) %>%
+  kable(title="Some major groupings in 'other' forms of employment", col.names=c("Employment group","count"))
+```
+
+### *Emp_other* reassignment
+
+*Emp_other* entries will be reassigned to new versions of existing variables ending in *_reas* (eg *Emp_FTwork* to *Emp_FTwork_reas*. Entries from original variables will also be added to their new *_reas* versions to provide immediately useable data. 
+
+The major groups outlined above will be reassigned as:
+
+- Maternity/paternity and houseworker/carer to *Emp_home_reas*
+- Retired to *Emp_retired_reas*
+- Voluntary worker to *Emp_volwork_reas*
+
+The 22 self-employed respondants are difficult to assign to other employment groups as they may be in full- or part-time work. Looking the *HH_income* level for the respondants, alongside *EMp_othertxt*, may give some clue as to employment type. Higher income brackets are likely to be full-time, lower income brackets part-time.
+
+```{r Self-employed assessment}
+## Query ID, HH_income, Emp_othertxt, Emp_grp to manually assess employment type
+ppv.tmp %>%
+  inner_join(emp_oth_only, "ID") %>%
+  mutate(Emp_grp = ifelse(grepl("Self|self", Emp_othertxtX), "Self-employed", NA)) %>%
+  select(ID, HH_income, Emp_othertxtX, Emp_grp) %>%
+  filter(!is.na(Emp_grp)) %>%
+  arrange(desc(HH_income)) %>%
+  kable(title="Income brackets for 'self-employed' individuals")
+## FT -> c(345, 1450, 185, 1008, 71, 1877, 4056, 4367, 4939)
+## PT -> c(1544, 2051, 2415, 4456, 4980, 648, 3908, 2537)
+## Other -> c(224, 1088, 3616, 4210, 4564)
+```
+From this assessment we can assign 17 self-employed respondants to full-time or part-time employment types with some confidence. The remaining 5 self-employed respondants will remain as *Emp_other*.
+
+Other text descriptions on an ad hoc basis as set out in the code below through listing the response IDs involved.
+
+#### Self-employed
+```{r Reassign self-employed}
+## Full-time
+## FT -> c(345, 1450, 185, 1008, 71, 1877, 4056, 4367, 4939)
+ppv.tmp2 <- ppv.tmp %>%  
+  mutate(Emp_FTwork_reas = Emp_FTwork) %>%
+  mutate(Emp_FTwork_reas = ifelse(is.na(Emp_FTwork_reas) | Emp_FTwork_reas==0, ifelse(ID %in% c(345, 1450, 185, 1008, 71, 1877, 2430, 4056, 4367, 4939), 1, Emp_FTwork_reas), Emp_FTwork_reas)) 
+# %>%
+#     select(ID, Emp_FTwork_reas, Emp_FTwork) %>%
+#     View()
+## Check ok 
+
+## Part-time
+## PT -> c(1544, 2051, 2415, 4456, 4980, 648, 3908, 2537)
+ppv.tmp2 <- ppv.tmp2 %>%  
+  mutate(Emp_PTwork_reas = Emp_PTwork) %>%
+  mutate(Emp_PTwork_reas = ifelse(is.na(Emp_PTwork_reas) | Emp_PTwork_reas==0, ifelse(ID %in% c(1544, 2051, 2415, 4456, 4980, 648, 3908, 2537), 1, Emp_PTwork_reas), Emp_PTwork_reas))
+# %>%
+#     select(ID, Emp_PTwork_reas, Emp_PTwork) %>%
+#     View()
+## Check ok
+```
+
+*Emp_other* entries from the remaining response IDs will be reassigned manually as follows.
+```{r Manually reassign Emp_other}
+## Remaining Emp_other responses to be reassigned
+## Scan through this dataset and attribute IDs to specific new Emp _reas variables.
+emp_oth_only %>%
+  filter(!ID %in% c(345, 1450, 185, 1008, 71, 1877, 4056, 4367, 4939, 1544, 2051, 2415, 4456, 4980, 648, 3908, 2537, 224, 1088, 3616, 4210, 4564)) %>%
+  View()
+
+## Reassign as follows:
+
+## Emp_FTwork_reas
+ppv.tmp3 <- ppv.tmp2 %>%
+  mutate(Emp_FTwork_reas = ifelse(is.na(Emp_FTwork_reas) | Emp_FTwork_reas==0, ifelse(ID %in% c(812, 1022, 1215, 2080, 3183, 4004, 4017), 1, Emp_FTwork_reas), Emp_FTwork_reas)) 
+# %>%
+#   select(ID, Emp_FTwork_reas, Emp_FTwork, Emp_other, Emp_othertxt) %>%
+#   View()
+
+
+# Emp_PTwork_reas
+ppv.tmp3 <- ppv.tmp3 %>%
+  mutate(Emp_PTwork_reas = ifelse(is.na(Emp_PTwork_reas) | Emp_PTwork_reas==0, ifelse(ID %in% c(2498, 4433), 1, Emp_PTwork_reas), Emp_PTwork_reas))
+
+
+# Emp_PTstud_reas
+ppv.tmp3 <- ppv.tmp3 %>%
+  mutate(Emp_PTstud_reas = Emp_PTstud) %>%
+  mutate(Emp_PTstud_reas = ifelse(is.na(Emp_PTstud_reas) | Emp_PTstud_reas==0, ifelse(ID %in% c(2550), 1, Emp_PTstud_reas), Emp_PTstud_reas)) 
+
+
+# Emp_looking_reas
+ppv.tmp3 <- ppv.tmp3 %>%
+  mutate(Emp_looking_reas = Emp_looking) %>%
+  mutate(Emp_looking_reas = ifelse(is.na(Emp_looking_reas) | Emp_looking_reas==0, ifelse(ID %in% c(3187), 1, Emp_looking_reas), Emp_looking_reas))
+
+
+# Emp_notlkg_reas
+ppv.tmp3 <- ppv.tmp3 %>%
+  mutate(Emp_notlkg_reas = Emp_notlkg) %>%
+  mutate(Emp_notlkg_reas = ifelse(is.na(Emp_notlkg_reas) | Emp_notlkg_reas==0, ifelse(ID %in% c(188, 568, 728, 997, 1529, 1566, 1835, 1930, 2774, 4155, 4407, 4883), 1, Emp_notlkg_reas), Emp_notlkg_reas))
+
+
+# Emp_retired_reas
+ppv.tmp3 <- ppv.tmp3 %>%
+  mutate(Emp_retired_reas = Emp_retired) %>%
+  mutate(Emp_retired_reas = ifelse(is.na(Emp_retired_reas) | Emp_retired_reas==0, ifelse(ID %in% c(3311, 4028, 4030, 4572, 4765, 5220), 1, Emp_retired_reas), Emp_retired_reas))
+
+# Emp_volwork_reas
+ppv.tmp <- ppv.tmp %>%
+  mutate(Emp_volwork_reas = Emp_volwork) %>%
+  mutate(Emp_volwork_reas = ifelse(is.na(Emp_volwork_reas) | Emp_volwork_reas==0, ifelse(ID %in% c(4213, 4466, 4567), 1, Emp_volwork_reas), Emp_volwork_reas))
+
+ppv.tmp %>% select(ID, starts_with("Emp_v")) %>% filter(Emp_volwork==1 | Emp_volwork_reas==1) %>% View()
+
+# Emp_home_reas
+ppv.tmp3 <- ppv.tmp3 %>%
+  mutate(Emp_home_reas = Emp_home) %>%
+  mutate(Emp_home_reas = ifelse(is.na(Emp_home_reas) | Emp_home_reas==0, ifelse(ID %in% c(31, 73, 464, 2079, 2354, 2374, 2563, 2623, 2669, 2740, 3245, 3261, 3432, 3745, 3925, 3937, 4400, 4415, 4494, 4523, 4788, 4831, 5095, 5154, 5242), 1, Emp_home_reas), Emp_home_reas))
+
+
+# Emp_refused_reas
+ppv.tmp3 <- ppv.tmp3 %>%
+  mutate(Emp_refused_reas = Emp_refused) %>%
+  mutate(Emp_refused_reas = ifelse(is.na(Emp_refused_reas) | Emp_refused_reas==0, ifelse(ID %in% c(4876), 1, Emp_refused_reas), Emp_refused_reas))
+
+
+# Emp_other_reas
+## These need to be zero as they have another Emp_... choice: c(80, 255, 267, 309, 1135, 1140, 1251, 1403, 1517, 1554, 1575, 1841, 1931, 2008, 2047, 2096, 2201, 2430, 2445, 2530, 2983, 3655, 3681, 4041, 4074, 4213, 4386, 4448, 4466, 4567, 4638, 5014, 5150, 5214) (n=34)
+
+## These are reassigned self-employed and need to be zero: c(345, 1450, 185, 1008, 71, 1877, 4056, 4367, 4939, 1544, 2051, 2415, 4456, 4980, 648, 3908, 2537, 224, 1088, 3616, 4210, 4564) (n=17)
+
+## These also need to be zero as they have been reassigned manually: c(812, 1022, 1215, 2080, 3183, 4004, 4017, 2498, 4433, 2550, 3187, 188, 568, 728, 997, 1529, 1566, 1835, 1930, 2774, 4155, 4407, 4883, 3311, 4028, 4030, 4572, 4765, 5220, 31, 73, 464, 2079, 2354, 2374, 2563, 2623, 2669, 2740, 3245, 3261, 3432, 3745, 3925, 3937, 4400, 4415, 4494, 4523, 4788, 4831, 5095, 5154, 5242, 4876) (n=55)
+
+## These need to remain 1 in Emp_other_reas as they cannot be reassigned: 224, 1088, 3616, 4210, 4564 from the self-employed assessment (n=5) and c(162, 171, 485, 509, 678, 1350, 1372, 2176, 2514, 3130, 3693, 3788, 3871, 4423, 4698, 4953, 5048, 224, 1088, 3616, 4210, 4564) from the manual reassignment exercise (n=22)
+
+## Total n = 34+17+55+22 = 128
+
+
+ppv.tmp3 <- ppv.tmp3 %>%
+  mutate(Emp_other_reas = NA) %>%
+  mutate(Emp_other_reas = ifelse(ID %in% c(162, 171, 485, 509, 678, 1350, 1372, 2176, 2514, 3130, 3693, 3788, 3871, 4423, 4698, 4953, 5048, 224, 1088, 3616, 4210, 4564), 1, Emp_other_reas)) %>%
+  mutate(Emp_other_reas = ifelse(is.na(Emp_other_reas), ifelse(ID %in% c(80, 255, 267, 309, 1135, 1140, 1251, 1403, 1517, 1554, 1575, 1841, 1931, 2008, 2047, 2096, 2201, 2430, 2445, 2530, 2983, 3655, 3681, 4041, 4074, 4213, 4386, 4448, 4466, 4567, 4638, 5014, 5150, 5214, 345, 1450, 185, 1008, 71, 1877, 4056, 4367, 4939, 1544, 2051, 2415, 4456, 4980, 648, 3908, 2537, 224, 1088, 3616, 4210, 4564, 812, 1022, 1215, 2080, 3183, 4004, 4017, 2498, 4433, 2550, 3187, 188, 568, 728, 997, 1529, 1566, 1835, 1930, 2774, 4155, 4407, 4883, 3311, 4028, 4030, 4572, 4765, 5220, 31, 73, 464, 2079, 2354, 2374, 2563, 2623, 2669, 2740, 3245, 3261, 3432, 3745, 3925, 3937, 4400, 4415, 4494, 4523, 4788, 4831, 5095, 5154, 5242, 4876), 0, Emp_other_reas),Emp_other_reas))
+
+## Check
+ppv.tmp3 %>%
+  select(ID, Emp_other_reas, Emp_other, Emp_othertxt) %>%
+  View()
+## OK
+
+## Set changes
+ppv <- ppv.tmp3
+
+## Clean up
+rm(ppv.tmp, ppv.tmp2, ppv.tmp3, emp_oth_only)
+```
+Twenty-two *Emp_other* could not be reassigned. One-hundred and six *Emp_other entries* have been reassigned to other Employment variables. New *Emp_* variables have been created that hold the revised version of the *Emp_* variable (pre-check entries plus/minus revisions). The new variables comprise *Emp_FTwork_reas*, *Emp_PTwork_reas*, *Emp_PTstudy_reas*, *Emp_looking_reas*, *Emp_notlkg_reas*, *Emp_retired_reas*, *Emp_volwork_reas*, *Emp_home_reas*, *Emp_other_reas*, and *Emp_refused_reas*. They are related to existing employment variables as:
+
+*Emp_FTwork* -> *Emp_FTwork_reas*
+*Emp_PTwork* -> *Emp_PTwork_reas*
+*Emp_PTstudy* -> *Emp_PTstudy_reas*
+*Emp_looking* -> *Emp_looking_reas*
+*Emp_notlkg* -> *Emp_notlkg_reas*
+*Emp_retired* -> *Emp_retired_reas*
+*Emp_volwork* -> *Emp_volwork_reas*
+*Emp_home* -> *Emp_home_reas*
+*Emp_other* -> *Emp_other_reas*
+*Emp_refused* -> *Emp_refused_reas*
+
+
+## 2. *Emp_FTwork*: Create new variables.
+
+These will be based on employment entries containing entries reassigned from *Emp_other*.
+
+### a) paid employment or not
+Including *Emp_FTwork_reas* and *Emp_PTwork_reas*. Also *Emp_other_reas* where there are indications is paid employment in *Emp_othertxt* (ie IDs in 162, 171, 485, 509, 678, 1350, 1372, 2176, 2514, 3130, 3693, 3788, 3871, 4423, 4698, 4953, 5048, 224, 1088, 3616, 4210, 4564)
+
+Find paid work in *Emp_other_reas*.
+```{r Find paid work in Emp_other_reas}
+## Temp data
+ppv.tmp <- ppv
+
+## Check Emp_other_reas text for paid work entries.
+emp.oth <- ppv.tmp %>%
+  select(ID, Emp_othertxt, Emp_othertxt) %>%
+  filter(ID %in% c(162, 171, 485, 509, 678, 1350, 1372, 2176, 2514, 3130, 3693, 3788, 3871, 4423, 4698, 4953, 5048, 224, 1088, 3616, 4210, 4564))
+
+## All are paid except IDs 1372, 3693, and NAs
+## Create list of paid IDs
+emp.pay.ID <- emp.oth %>%
+  na.omit(Emp_othertxt) %>%
+  filter(!ID %in% c(1372, 3693)) %>%
+  select(ID) %>%
+  .$ID
+
+## Create list of unpaid IDs
+emp.unpay.ID <- emp.oth %>%
+  filter(ID %in% c(1372, 3693) | is.na(Emp_othertxt)) %>%
+  select(ID) %>%
+  .$ID
+```
+There are 10 *Emp_other_reas* entries that can be attributed to paid work. We can't say whether the 12 other responses in *Emp_other_reas* are paid or not.
+
+Now find all paid work.
+```{r Find FT and PT work}
+
+ppv.tmp2 <- ppv.tmp %>%
+  # filter(ID %in% emp.oth.ID | Emp_FTwork_reas==1 | Emp_PTwork_reas==1) 
+  mutate(Emp_paid = ifelse(ID %in% emp.pay.ID | Emp_FTwork_reas==1 | Emp_PTwork_reas==1, 1, NA)) %>%
+  mutate(Emp_paid = ifelse(is.na(Emp_paid), ifelse(ID %in% emp.unpay.ID, 3, Emp_paid), Emp_paid)) %>%
+  mutate(Emp_paid = ifelse(is.na(Emp_paid), 2, Emp_paid)) 
+# %>%
+  # select(ID, Emp_paid, Emp_FTwork_reas, Emp_PTwork_reas, Emp_other_reas, Emp_othertxt) %>%
+  # group_by(Emp_paid) %>%
+  # summarise(count=n())
+  # View()
+## 3323 paid, 1341 unpaid, 12 no evidence of paid or unpaid
+
+
+## Check
+ppv.tmp2 %>%
+  select(ID, Emp_paid, Emp_FTwork_reas, Emp_PTwork_reas, Emp_other_reas, Emp_othertxt) %>%
+  # filter(Emp_paid==1) %>%
+  View()
+
+glimpse(ppv.tmp2)
+## OK
+
+## Set changes
+ppv <- ppv.tmp2
+
+## Clean up
+rm(emp.oth, emp.pay.ID, emp.unpay.ID, ppv.tmp2, ppv.tmp)
+```
+Summary of *Emp_paid* variable.
+
+| Value | Value label | count |
+|:------|:------------|:------|
+|1      | Paid employment| 3323|
+|2      | Not paid    | 1341  |
+|3     | Unknown     | 12    |
+
+
+
+### b) full-time paid employment or not
+
+Create new variable *Emp_FT*. Find where *Emp_FTwork_reas*=1 and where *Emp_FTwork_reas*=0/NA. But exclude *Emp_other_reas* as we have no evidence, and also exclude IDs 991 and 1166, which are NA where no answer was provided.
+
+```{r Find FT work vs not}
+## Temp data
+ppv.tmp <- ppv
+
+ppv.tmp2 <- ppv.tmp %>%
+  mutate(Emp_FT = ifelse(Emp_FTwork_reas==1, 1, NA)) %>%
+  mutate(Emp_FT = ifelse(is.na(Emp_FT), ifelse(is.na(Emp_FTwork_reas) | Emp_FTwork_reas==0, 2, Emp_FT), Emp_FT)) %>%
+  mutate(Emp_FT = ifelse(is.na(Emp_FT), 2, Emp_FT)) 
+# %>%
+#   select(ID, Emp_FT, Emp_paid, Emp_PTwork_reas, Emp_FTwork_reas, Emp_other_reas) %>%
+#   View()
+## 1878 not FT employment, 2798 have FT employment
+
+## Check
+ppv.tmp2 %>%
+  select(ID, Emp_FT, Emp_paid, Emp_PTwork_reas, Emp_FTwork_reas, Emp_other_reas) %>%
+  View()
+## OK
+
+## Set changes
+ppv <- ppv.tmp2
+
+## Clean up
+rm(ppv.tmp2, ppv.tmp)
+```
+
+Summary of *Emp_FT* variable.
+
+| Value | Value label | count |
+|:------|:------------|:------|
+|1      | Paid full-time employment| 2798|
+|2      | Not in paid full-time employment  | 1878  |
+
+
+
+
+
+
+
+
+
+
+

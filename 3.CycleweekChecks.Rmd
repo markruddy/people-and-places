@@ -1,0 +1,269 @@
+---
+title: "Cycleweek consistency checks."
+author: "Mark Ruddy"
+date: "17 June 2016"
+output: html_document
+---
+
+```{r Load packages, include=FALSE}
+library(dplyr)
+library(tidyr)
+library(stringr)
+```
+
+```{r Load data}
+## Load data
+load("~/Documents/Personal/Work/DataScience/PeopleAndPlaces/Data/Original/pp.data.RData")
+dim(pp)
+```
+
+# Cycleweek Tasks
+
+1. Check that Cycleweek are 0 or 1 only if other trip indicator variables agree (could be zero by default in survey).
+2. Create new variable flagging up inconsistencies.
+
+Need to compare Cycleweek with other indicators of cycling in last week:
+
+* MinsCycling
+* Diary1cyc, Diary2cyc, Diary3cyc, Diary4cyc, Diary5cyc, Diary6cyc, Diary7cyc
+* Cyc1min, Cyc2min, Cyc3min, Cyc4min, Cyc5min, Cyc6min, Cyc7min
+
+
+## Cycleweek entries check.
+
+Are any Cycleweek entries entered as 'refused', other strings or NA?
+
+```{r Cycleweek entries}
+## Check 'refused' responses - should just be 0 or 1
+distinct(select(pp, Cycleweek))
+```
+There are no 'refused' entries in Cycleweek. All coded as 0 or 1.
+
+## Cycleweek=0 and Diary?cyc=1 check.
+
+Where Cycleweek=0, are there any cycling diary entries that are 1 (Diary?cyc=1).
+
+```{r NO Cycleweek but YES Diary?cyc}
+## Check dimensions of Cycleweek=0 & Diary?Cyc=1
+ppv %>%
+  filter(Cycleweek==0 | is.na(Cycleweek), Diary1cyc==1 | Diary2cyc==1 | Diary3cyc==1 | Diary4cyc==1 | Diary5cyc==1 | Diary6cyc==1 | Diary7cyc==1) %>%
+  select(ID, Cycleweek, Diary1cyc, Diary2cyc, Diary3cyc, Diary4cyc, Diary5cyc, Diary6cyc, Diary7cyc) %>%
+  dim()
+```
+There are 40 records of 'not cycling during the last week' that have an associated cycling diary entry.
+
+
+Add 'noCycleweek_yesDiary' variable flagging these.
+```{r Add noCycleweek_yesDiary variable}
+## Add flagging variable
+
+ppv <- ppv %>%
+  mutate(noCycleweek_yesDiary = ifelse((Cycleweek==0 | is.na(Cycleweek)) & (Diary1cyc==1 | Diary2cyc==1 | Diary3cyc==1 | Diary4cyc==1 | Diary5cyc==1 | Diary6cyc==1 | Diary7cyc==1), 1, NA))
+
+ppv %>%
+  select(ID, noCycleweek_yesDiary, Cycleweek, Diary1cyc, Diary2cyc, Diary3cyc, Diary4cyc, Diary5cyc, Diary6cyc, Diary7cyc) %>%
+  filter(noCycleweek_yesDiary == 1) %>%
+  View()
+
+## check that new variable records match earlier dplr Cycleweek/Diary?cyc query
+## ref http://stackoverflow.com/a/21629102 use dply::collect to get vector from tbl_df
+cw_dy <- pp %>%
+  filter(Cycleweek==0, Diary1cyc==1 | Diary2cyc==1 | Diary3cyc==1 | Diary4cyc==1 | Diary5cyc==1 | Diary6cyc==1 | Diary7cyc==1) %>%
+  select(ID) %>%
+  collect %>% .[["ID"]]
+
+cw_dy_var <- ppv %>%
+  filter(noCycleweek_yesDiary == 1) %>%
+  select(ID) %>%
+  collect %>% .[["ID"]]
+
+cw_dy %in% cw_dy_var
+## yes! they match - so flag is correct
+
+## Clean up
+rm(cw_dy, cw_dy_var)
+```
+
+## Cycleweek=1 and Diary?cyc=0 check.
+
+Where Cycleweek=1 are there any cycling diary entries that are zero (Diary?cyc=0).
+```{r YES Cycleweek but NO Diary?cyc}
+ppv %>%
+  filter(Cycleweek==1, (Diary1cyc==0 | is.na(Diary1cyc)) & (Diary2cyc==0 | is.na(Diary2cyc)) & (Diary3cyc==0 | is.na(Diary3cyc)) & (Diary4cyc==0 | is.na(Diary4cyc)) & (Diary5cyc==0 | is.na(Diary5cyc)) & (Diary6cyc==0 | is.na(Diary6cyc)) & (Diary7cyc==0 | is.na(Diary7cyc))) %>%
+  select(ID, Cycleweek, Diary1cyc, Diary2cyc, Diary3cyc, Diary4cyc, Diary5cyc, Diary6cyc, Diary7cyc) %>%
+  View()
+```
+There are zero records where Cycleweek=1 and no cycling diary entry.
+
+
+## Cycleweek and MinsCycling variable check.
+
+What variables have been entered in MinsCycling (Cycling minutes during last week). This should just be numeric but are there NAs or letters?
+
+```{r MinsCycling entries}
+## Check for NAs
+ppv %>%
+  filter(is.na(MinsCycling)) %>%
+  select(ID, Cycleweek, MinsCycling, Cyc1min:Cyc7min)
+## No NAs
+  
+## Check for letters in MinsCycling responses - should just be numbers
+## ref http://stackoverflow.com/a/21629102 to get character vector from tbl_df
+mc <- collect(select(ppv,MinsCycling))[[1]]
+pattern <- "[A-z]"
+mc[str_detect(mc, pattern)]
+rm(mc, pattern)
+```
+No NAs or letters in MinsCycling.
+
+## Cycleweek=0 and MinsCycling>0 check.
+
+Are there instances of Cycleweek=0 & MinsCycling>0?
+```{r NO Cycleweek but YES MinsCycling}
+pp %>%
+  filter(Cycleweek==0 | is.na(Cycleweek), MinsCycling>0) %>%
+  dim()
+```
+There are zero records of Cycleweek=0 with MinsCycling>0.
+
+## Cycleweek=1 and MinsCycling=0 or NA check.
+
+Are there instances of Cycleweek=1 but MinsCycling=0 or NA?
+```{r YES Cycleweek but NO MinsCycling}
+pp %>%
+  filter(Cycleweek==1, MinsCycling==0 | is.na(MinsCycling)) %>%
+  select(ID, Cycleweek, MinsCycling) %>%
+  dim()
+```
+There are 22 records of Cycleweek=1 with MinsCycling=0.
+
+Add 'yesCycleweek_noMinsCycling' variable flagging these.
+```{r Add yesCycleweek_noMinsCycling variable}
+## Add flagging variable
+ppv <- ppv %>%
+  mutate(yesCycleweek_noMinsCycling = ifelse(Cycleweek==1 & MinsCycling==0, 1, NA))
+
+ppv %>%
+  select(ID, yesCycleweek_noMinsCycling, Cycleweek, MinsCycling) %>%
+  filter(yesCycleweek_noMinsCycling == 1) %>%
+  View()
+
+## check that new variable records match earlier dplyr Cycleweek/MinsCycling query
+## ref http://stackoverflow.com/a/21629102 use dply::collect to get vector from tbl_df
+a <- pp %>%
+  filter(Cycleweek==1, MinsCycling==0) %>%
+  select(ID) %>%
+  collect %>% .[["ID"]]
+
+b <- ppv %>%
+  filter(yesCycleweek_noMinsCycling == 1) %>%
+  select(ID) %>%
+  collect %>% .[["ID"]]
+
+a %in% b
+## yes! they match - so flag is correct
+
+## Clean up
+rm(a, b)
+```
+
+
+
+## Cycleweek and Cyc?min variable check.
+
+Check that where Cyclweek=0 doesn't have any Cyc?min entries.
+```{r Cycleweek vs Cyc?min NA entries}
+# Check Cycleweek==0 but Cyc?min are not NA
+pp %>%
+  select(ID, Cycleweek, Cyc1min:Cyc7min) %>%
+  filter(Cycleweek==0, !is.na(Cyc1min) | !is.na(Cyc2min) | !is.na(Cyc3min) | !is.na(Cyc4min) | !is.na(Cyc5min) | !is.na(Cyc6min) | !is.na(Cyc7min)) %>%
+  dim()
+```
+No Cyc?min entries with Cycleweek=0.
+
+## Cycleweek=1 and Cyc?min=0 or NA check.
+
+Where Cycleweek=1, are there NA entries to cycling minutes per day (Cyc?min) variables?
+```{r YES Cycleweek but NO Cyc?min}
+pp %>%
+  select(ID, Cycleweek, Cyc1min:Cyc7min) %>%
+  filter(Cycleweek==1, (is.na(Cyc1min) | Cyc1min==0) & (is.na(Cyc2min) | Cyc2min==0) & (is.na(Cyc3min) | Cyc3min==0) & (is.na(Cyc4min) | Cyc4min==0) & (is.na(Cyc5min) | Cyc5min==0) & (is.na(Cyc6min) | Cyc6min==0) & (is.na(Cyc7min) | Cyc7min==0)) %>%
+  View()
+
+## 22 records
+
+```
+There are 22 instances of Cycleweek=1 with NA or 0 values for cycling minutes.
+
+Add 'yesCycleweek_noCycmins' variable flagging these.
+```{r Add yesCycleweek_noCycmins variable}
+## Add flagging variable
+ppv <- ppv %>%
+  mutate(yesCycleweek_noCycmins = ifelse(Cycleweek==1 & (is.na(Cyc1min) | Cyc1min==0) & (is.na(Cyc2min) | Cyc2min==0) & (is.na(Cyc3min) | Cyc3min==0) & (is.na(Cyc4min) | Cyc4min==0) & (is.na(Cyc5min) | Cyc5min==0) & (is.na(Cyc6min) | Cyc6min==0) & (is.na(Cyc7min) | Cyc7min==0), 1, NA))
+
+ppv %>%
+  select(ID, yesCycleweek_noCycmins, Cycleweek, Cyc1min) %>%
+  filter(yesCycleweek_noCycmins == 1) %>%
+  View()
+```
+
+
+? are yesCycleweek_noCycmins the same records as yesCycleweek_noMinsCycling records?
+```{r Join by ID}
+ppv.MinsCyc <- ppv %>%
+  select(ID, yesCycleweek_noMinsCycling) %>%
+  filter(yesCycleweek_noMinsCycling==1) %>%
+  mutate(type = "MinsCyc")
+
+ppv.Cycmin <- ppv %>%
+  select(ID, yesCycleweek_noCycmins) %>%
+  filter(yesCycleweek_noCycmins==1) %>%
+  mutate(type = "Cycmins")
+
+join <- inner_join(ppv.Cycmin, ppv.MinsCyc, by="ID")
+  
+View(join)
+
+## Yes they are the same
+
+rm(join, ppv.Cycmin, ppv.MinsCyc)
+```
+
+## Combine yesCycleweek_noMinsCycling and yesCycleweek_noCycmins
+
+As the combination of Cycleweek=1 and Cyc?mins=0 or NA, and Cycleweek=1 and MinsCycling=0 or NA, yield the same records, they can be combined together into the same flagging variable.
+
+```{r Combine yesCycleweek_noMinsCycling and yesCycleweek_noCycmins}
+## Remove yesCycleweek_noMinsCycling and rename yesCycleweek_noCycmins variables
+ppv <- ppv %>%
+  select(-yesCycleweek_noMinsCycling) %>%
+  rename(yesCycleweek_noMins = yesCycleweek_noCycmins)
+
+ppv %>%
+  filter(yesCycleweek_noMins==1) %>%
+  select(ID, Cycleweek, yesCycleweek_noMins, MinsCycling, Cyc1min) %>%
+  View()
+```
+
+
+## Cycleweek=0 and Cyc?min=1 check.
+
+```{r NO Cycleweek and YES Cyc?min}
+# Check Cycleweek==0 but Cyc?min... are not zero
+ppv %>%
+  select(ID, Cycleweek, Cyc1min:Cyc7min) %>%
+  filter((Cycleweek==0 | is.na(Cycleweek)), Cyc1min>0 & Cyc2min>0 & Cyc3min>0 & Cyc4min>0 & Cyc5min>0 & Cyc6min>0 & Cyc7min>0) %>%
+  dim()
+```
+There are zero instances of Cycleweek as zero with positive inputs for cycling minutes.
+
+
+
+
+
+
+
+
+
+
+

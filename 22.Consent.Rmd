@@ -1,0 +1,81 @@
+---
+title: "Consent next year"
+author: "Mark Ruddy"
+date: "2 August 2016"
+output: html_document
+---
+
+Load libraries and data
+```{r Setup, include=FALSE}
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(knitr)
+library(ggplot2)
+# setwd("/Users/markruddy/Documents/Personal/Work/DataScience/PeopleAndPlaces/")
+# load("./Data/pp.data.RData")
+```
+
+## Task
+
+*Consent_nxt_yr*: Recode missing values as No.
+Values: 1="yes"; 2="no"
+
+```{r Change missing to no}
+## Temp data
+ppv.tmp <- ppv
+
+## Scope
+ppv.tmp %>%
+  select(Consent_nxt_yr) %>%
+  group_by(Consent_nxt_yr) %>%
+  summarise(count=n()) %>%
+  kable(title="Summary of Consent_nxt_yr values")
+## 1,2,NA
+
+ppv.tmp2 <- ppv.tmp %>%
+  mutate(Consent_nxt_yr_reas = ifelse(Consent_nxt_yr==1, 1, NA)) %>%
+  mutate(Consent_nxt_yr_reas = ifelse(is.na(Consent_nxt_yr), ifelse(Consent_nxt_yr==2, 2, Consent_nxt_yr_reas), Consent_nxt_yr_reas)) %>%
+  mutate(Consent_nxt_yr_reas = ifelse(is.na(Consent_nxt_yr_reas), 2, Consent_nxt_yr_reas)) 
+# %>%
+  # select(ID, Consent_nxt_yr, Consent_nxt_yr_reas) %>%
+  # filter(is.na(Consent_nxt_yr)) %>%
+  # View()
+
+## Check
+ppv.tmp2 %>%
+  select(ID, Consent_nxt_yr, Consent_nxt_yr_reas) %>%
+  View()
+## OK. 744 without consent, 3932 with consent
+glimpse(ppv.tmp2)
+## OK
+
+## Set changes
+ppv <- ppv.tmp2
+
+## Clean up
+rm(ppv.tmp2, ppv.tmp)
+```
+
+Summary of *Consent_nxt_yr_reas* variable.
+
+| Value | Value label | count |
+|:------|:------------|:------|
+|1      | Consent| 3932|
+|2      | No consent  | 744  |
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,177 @@
+---
+title: "Survey Group - description and data preparation"
+author: "Mark Ruddy"
+date: "16 August 2016"
+output: html_document
+---
+
+Load libraries and data
+```{r Load libraries, include=FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(knitr)
+
+setwd("~/Documents/Personal/Work/DataScience/PeopleAndPlaces")
+load("./Data/pp.data.RData")
+```
+
+
+## Description of Problem
+
+Variable *SurveyGp* refers to the origins of survey responses. Some responses were received from leaflets, other respondants were contacted via email from TfL's Cyclist or Oyster databases (see [Table 1][tabSurveyGp]). The database origins of some respondants is unknown, but these unknowns could be either from Oyster or Cyclist databases.
+
+| SurveyGp ID | Database | Count |
+|:------------|:---------|:------|
+| 1           | Leaflet  | 1337 |
+| 2           | Oyster Database | 1259 |
+| 3           | Cyclist Database | 1358 |
+| 4           | Unknown (Oyster or Cyclist) | 722 |
+[Table 1: Summary of different *SurveyGp* survey groups and the number of responses in each group.][tabSurveyGp]
+
+```{r Explore SurveyGp, include=FALSE}
+## Temp dataset
+ppv.tmp <- ppv
+
+## SurveyGp
+ppv.tmp %>%
+  select(SurveyGp) %>%
+  group_by(SurveyGp) %>%
+  summarise(count=n()) %>%
+  kable(caption="Counts of *SurveyGp* values.")
+
+## Clean up
+rm(ppv.tmp)
+```
+
+## Objective and Approach
+
+Attributing the 722 responses that have unknown database affinities to their database of origin means they can be used in further analyses. The objective of the following analysis is to classify records from the 'unknown' group to either Oyster or Cycle-hire databases.
+
+Machine learning methods will be used to classify responses. The approach taken will be as follows:
+
+1. Select variables upon which to base classification. Tidy and prepare these data.
+2. Determine if structure is present in the feature variables through cluster analysis - descriptive model.
+3. Training phase: Using Oyster and Cycle-hire groups as *training data* to adjust parameters of a predictive model capable of separating the two classes.
+4. Testing phase: Assign records of Unknown group to either Oyster or Cycle-hire database based on the training model.
+
+
+## Feature variable selection
+
+Survey Group constitutes the *target variable* for classification. Classification will be attempted based on the other *feature variables* associated with each record. Choosing variables for successful separation of groups is an important first step in classification analysis. The aim is to minimize redundancy and maximize relevance of feature variables in their ability to predict Survey Group. Some variables aren't able to provide information that can help distinguish between groups and so don't need to be considered during analysis - indeed they may even confound classification through random correlations with the target variable. Whilst the training model aims to separate classes, the ability to distinguish classes should be able to generalize enough to correctly assign unseen test cases (records of unknow group).
+
+Variable selection can be made by either manually choosing variables that are thought to be able to distinguish between groups or through the use of models that assess the relevance of variables to the classification process. In the current analysis feature variables will be chosen through assumption that they reflect key differences between members of Oyster and Cycle-hire databases such as modes of transport, household make up and income.
+
+One other consideration is that there is a computational penalty (in terms of processing time and resources) with increasing numbers of feature variables.
+
+### Disqualified variables
+
+There are some variables that do not characterise the respondant such as *StartedSurvey* or *Phone*. Other variables may be unsuitable as they are free-text entries. Consequently, the following variables will be excluded from clustering: 
+
+*ID*, *Startedsurvey*, *Completed*, *Source*, *Yesterday*, *Today_2*, *Today_3*, *Today_4*, *Today_5*, *Today_6*, *Today_7*, *HH_text*, *Childcyccom*, *Travelcomments*, *Areacomments*, *Gendertext*, *Disability_othtxt*, *Emp_othertxt*, *Consent_nxt_yr*, *Phone*, *ID*, *SurveyGp*.
+
+
+### Refining variable selection
+
+As the unknown respondants are from either *SurveyGp* ID 2 or 3, responses from the Leaflet group (ID 1) can be removed from assessment. *SurveyGp* ID 4 (the target of the research) will be retained for cluster analysis but excluded during classification analysis.
+
+A selection of feature variables that are considered to present the greatest potential to establish dissimilarity between groups will be chosen. The aim is to eliminate feature variables that are either not thought to provide information that separates Survey Groups or may be autocorrelated with other variables. This approach has the advantage of testing preconceived ideas about dissimilarities between groups. It also reduces the amount of data preparation required such as investigating and correcting inconsistencies between variables in the dataset, and converting variables into other data types.
+
+Classification will rely on core variables that potentially highlight differences between Oyster and Cycle-hire users. Feature variables will be selected from the following:
+
+* *MinsCycling*, *MinsWalking*, *MinsCar*.
+* *HH_carvan*.
+* *Total_walk*, *Total_cyc*, *Total_mcyc*, *Total_PT*, *Total_taxi*, *Total_car* .
+* *HH_income*.
+* *Emp_FTwork_reas*, *Emp_PTwork_reas*, *Emp_PTstud_reas*, *Emp_looking_reas*, *Emp_notlkg_reas*, *Emp_retired_reas*, *Emp_volwork_reas*, *Emp_home_reas*.
+
+Subsets from these feature variables will be experimented with for classification in order to minimise computational penalties. These variables have already been validated or require minimal cleaning (such as outlier removal). Attention needs to be paid to the following qualities of these variables, however:
+
+* Missing values coded as -99 need to be reassigned as NA
+* Assement of outliers
+
+### Tidying feature variables
+
+#### Select variables for initial clustering
+
+```{r Select variables for initial clustering}
+## Temp dataset
+ppv.tmp <- ppv
+
+## Create df of feature variables
+cdf <- ppv.tmp %>%
+  select(ID, SurveyGp, MinsCycling, MinsWalking, MinsCar, HH_carvan, Total_walk, Total_cyc, 
+Total_mcyc, Total_PT, Total_taxi, Total_car, HH_income, Emp_FTwork_reas, Emp_PTwork_reas, Emp_PTstud_reas, Emp_looking_reas, Emp_notlkg_reas, Emp_retired_reas, Emp_volwork_reas, Emp_home_reas)
+```
+
+#### Remove Leaflet survey group
+
+The Leaflet survey group is of no interest in this analysis and will be removed from consideration.
+```{r Remove Leaflet and unknown group}
+## Remove Leaflet group (ID=1) and unknown group ID 4
+cdf <- cdf %>%
+  filter(SurveyGp %in% c(2,3,4))
+```
+
+#### Interrogate erroneous values
+
+Response IDs 1723, 4638, 4685, 4500, and 5107 have erroneous entries for *MinsCycling*, *MinsWalking*, *MinsCar* variables. We need to check if any of these responses are present in *SurveyGp*s 2, 3 or 4.
+```{r Check presence of outlier IDs in SurveyGps of interest}
+cdf %>%
+  filter(ID %in% c(1723, 4638, 4685, 4500, 5107))
+```
+
+Only ID 1723 is present. The erroneous *MinsCycling* entry in this response will be replaced with a value of 60 mins to represent some cycling activity for this response, ensuring that it can contribute to the clustering analysis.
+```{r Remove Leaflet and unknown group}
+cdf <- cdf %>%
+  mutate(MinsCycling = ifelse(ID==1723, 60, MinsCycling))
+```
+
+Response ID 2807 is member of Survey Group 4 and possesses a *HH_carvan* of 10. This is likely to be an erroneous outlier given that *HH_number* for this record is 1 and the next largest *HH_carvan* values are 5. It could be that a keystroke error (entering 10 rather than 1) by respondant ID 2807 is the reason for this. *HH_carvan* for ID 2807 will be changed from 10 to 1 for the purposes of classification analysis in order to prevent this entry from unduly interfering with class assignment.
+```{r Error in HH_carvan entry}
+cdf <- cdf %>%
+  mutate(HH_carvan = ifelse(HH_carvan==10, 1, HH_carvan))
+```
+
+#### Missing values
+It is good practice to replace NAs with 0. There are no NAs in *MinsCycling*, *MinsWalking*, or *MinsCar*, *HH_carvan* and *Emp_?_reas* variables do have NAs. *Emp_?_reas* and *HH_income* variables also have -99 entries that need to be changed to 0. *Total_?* variables contain some NAs.
+```{r Replace NA with 0}
+
+cdf <- cdf %>% 
+  mutate(HH_carvan = ifelse(is.na(HH_carvan), 0, HH_carvan)) %>%
+  mutate(Emp_FTwork_reas = ifelse(is.na(Emp_FTwork_reas) | Emp_FTwork_reas==-99, 0, Emp_FTwork_reas)) %>%
+  mutate(Emp_PTwork_reas = ifelse(is.na(Emp_PTwork_reas) | Emp_PTwork_reas==-99, 0, Emp_PTwork_reas)) %>%
+  mutate(Emp_PTstud_reas = ifelse(is.na(Emp_PTstud_reas) | Emp_PTstud_reas==-99, 0, Emp_PTstud_reas)) %>%
+  mutate(Emp_looking_reas = ifelse(is.na(Emp_looking_reas) | Emp_looking_reas==-99, 0, Emp_looking_reas)) %>%
+  mutate(Emp_notlkg_reas = ifelse(is.na(Emp_notlkg_reas) | Emp_notlkg_reas==-99, 0, Emp_notlkg_reas)) %>%
+  mutate(Emp_retired_reas = ifelse(is.na(Emp_retired_reas) | Emp_retired_reas==-99, 0, Emp_retired_reas)) %>%
+  mutate(Emp_volwork_reas = ifelse(is.na(Emp_volwork_reas) | Emp_volwork_reas==-99, 0, Emp_volwork_reas)) %>%
+  mutate(Emp_home_reas = ifelse(is.na(Emp_home_reas) | Emp_home_reas==-99, 0, Emp_home_reas)) %>%
+  mutate(Total_walk = ifelse(is.na(Total_walk), 0, Total_walk)) %>%
+  mutate(Total_cyc = ifelse(is.na(Total_cyc), 0, Total_cyc)) %>%
+  mutate(Total_mcyc = ifelse(is.na(Total_mcyc), 0, Total_mcyc)) %>%
+  mutate(Total_PT = ifelse(is.na(Total_PT), 0, Total_PT)) %>%
+  mutate(Total_taxi = ifelse(is.na(Total_taxi), 0, Total_taxi)) %>%
+  mutate(Total_car = ifelse(is.na(Total_car), 0, Total_car)) %>%
+  mutate(HH_income = ifelse(is.na(HH_income) | HH_income==-99, 0, Total_car))
+
+```
+
+```{r Check NAs include=FALSE}
+## Check Feature Variables for NAs
+cdf %>%
+  # select(ID, Total_walk, Total_cyc, Total_mcyc, Total_PT, Total_taxi, Total_car) %>%
+  gather(feature_var, value, -ID) %>%
+  filter(is.na(value))
+```
+
+
+```{r Save classification data}
+
+setwd("~/Documents/Personal/Work/DataScience/PeopleAndPlaces")
+save(list=c("ppv", "cdf"), file="./Data/pp.class.RData")
+
+```
+
+
+
