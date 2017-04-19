@@ -1,0 +1,340 @@
+---
+title: "Survey Group - Introduction and Data Preparation"
+author: "Mark Ruddy"
+date: "14 August, 2016"
+output: html_document
+bibliography: bibliodb.bib
+---
+
+<!--
+************************************************************************************
+INSTRUCTIONS TO RUN R-code
+
+1. Install R (https://cran.rstudio.com/) and  RStudio (https://www.rstudio.com/)
+2. Read the user docs
+3. Within code 'chunks' change eval=FALSE to eval=TRUE
+4. Run R code and reproduce the steps within the study
+
+************************************************************************************
+-->
+
+```{r Load_libraries_data, include=FALSE, eval=TRUE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(knitr)
+library(caret)
+```
+
+```{r Load_data, include=FALSE, eval=TRUE}
+# To load the raw, cleaned data that the study is based upon
+# 1. Create a 'Working' directory somewhere of your own choice
+# 2. Move the pp.data.RData file accompanying this document to Working directory
+# 3. Run > setwd("path/tp/my/working/directory") # Where 'my/working/directory' is the path to you Working directory
+# 4. Run > load("./pp.data.RData")
+
+###########################
+# IGNORE THIS
+# There are Mark Ruddy's Working directory variables
+setwd("~/Documents/Personal/Work/DataScience/PeopleAndPlaces/Working/Classification")
+load("../Data/pp.data.RData")
+###########################
+```
+
+## Objective
+
+In the People and Places survey data the variable *SurveyGp* refers to the database origin of survey responses. Some records were responses from leafleting, others originated from emails sent to individuals whose details were held on TfL's Oyster and Cycle-hire databases. The database origin of some responses is unknown, but these unknowns could be either from Oyster or Cycle-hire databases (see Table below).
+
+**Table**: Summary of different *SurveyGp* database groups and the number of responses in each group.
+
+| SurveyGp | Database | Count |
+|:------------|:---------|:------|
+| 1           | Leaflet  | 1337 |
+| 2           | Oyster  | 1259 |
+| 3           | Cycle-hire | 1358 |
+| 4           | Unknown (Oyster or Cycle-hire) | 722 |
+|  Total           |      | 4676 |
+
+Attributing the 722 unknown records to their database of origin would enable these records to be used in further analyses. The objective in the current study then is to attempt to classify records from the 'unknown' group to either Oyster or Cycle-hire databases. 
+
+
+```{r Explore_SurveyGp, include=FALSE, eval=FALSE}
+## Temp dataset
+ppv.tmp <- ppv
+
+## SurveyGp
+ppv.tmp %>%
+  select(SurveyGp) %>%
+  group_by(SurveyGp) %>%
+  summarise(count=n()) %>%
+  kable(caption="Counts of *SurveyGp* values.")
+
+## Clean up
+rm(ppv.tmp)
+```
+
+## Approach
+
+Machine learning methods will be used to classify records. The approach taken will be as follows:
+
+1. Select *feature variables* upon which to base classification of the *target variable* (ie *SurveyGp*). Tidy and prepare these data.
+2. Supervised classification: using Oyster and Cycle-hire groups as *training data* to develop a predictive model capable of separating the two classes. This model can then be applied to records from the 'unknown' group.
+
+*NB: This study contains all R code used to modify and analyse the data. Where appropriate this code will be shown alongside the explanatory text, however, for ease of reading, the majority of code will be hidden from view. All code, as well as explanatory text, can be found alongside one another in the raw .Rmd files accompanying this document.*
+
+## Feature variable selection
+
+There are 2617 records of known database affilitation (combined total records in Oyster and Cycle-hire databases), and a potential number of 283 feature variables (from the cleaned survey dataset) that could be used to build a classification model. Not all feature variables will be relevant to the classification problem. Some will have no association with a database class, others will have negligible relationship to a database. Selecting a subset of feature variables that contain some information to contribute to separation of groups is an important first step in classification analysis. 
+
+Some feature variables contain no information that can help distinguish between groups - indeed they may even confound classification through random correlations with the target variable. These can be rejected from the model building process. In this study feature variables will be chosen through 'domain knowledge'; prior understanding that variables reflect differences between members of Oyster and Cycle-hire databases such as modes of transport, household make up and income. 
+
+One other consideration is that there is a computational penalty (in terms of processing time and resources) with increasing numbers of feature variables.
+
+### Irrelevant variables
+
+Some variables do not characterise the survey response such as *ID*, *Source* or *Phone*. Other variables may be unsuitable as they are free-text entries. Consequently, the following variables will be excluded from analysis: 
+
+*ID*, *Source*, *Yesterday*, *HH_text*, *Childcyccom*, *Travelcomments*, *Areacomments*, *Gendertext*, *Disability_othtxt*, *Emp_othertxt*, *Consent_nxt_yr*, *Phone*, *ID*, *SurveyGp*.
+
+### Temporal variation
+
+Feature variables related to the time and date that survey responses were submitted could potentially differentiate between database groups. For instance, if members of each database were contacted on different dates, the resulting responses may have been received on different dates. 
+
+The following are eight feature variables linked to response date/time: *Startedsurvey*, *Completed*, *Today_2*, *Today_3*, *Today_4*, *Today_5*, *Today_6*, *Today_7*.
+
+All of these variables are correlated with one another because they are intimately related to or based upon the *Startedsurvey* variable. The *Startedsurvey* variable was assessed for patterns between databases to determine if this is likely to be a useful classifier (Figure 1). This shows there is little to differentiate between Oyster and Cycle-hire database in survey response date. Both survey groups show similar spikes in activity, particularly on the 11th, 12th, and 13th of May. However, there appears to be no structure or clustering that separates responses from the two database groups in time.
+
+```{r Plot_TS, fig.width=9, include=TRUE, echo=FALSE, results='hide', warning=FALSE, fig.cap="Figure 1: Survey start date and time for Oyster and Cycle-hire databases"}
+Q <- ppv %>%
+  select(SurveyGp, Startedsurvey) %>%
+  filter(SurveyGp %in% c(2,3)) %>%
+  mutate(SurveyGp = as.factor(SurveyGp)) %>%
+  mutate(SurveyGp = ifelse(SurveyGp==2,"Oyster","Cycle"))
+
+p <- ggplot(Q, aes(Startedsurvey, colour = SurveyGp, linetype = SurveyGp)) + 
+  geom_freqpoly(bins = 1000, alpha = 0.9) +
+  scale_x_datetime(date_breaks = "1 day", date_labels = "%b %d")
+
+p
+
+# ggsave(filename = "../Figures/SurveyGp_date.pdf", plot = p, width = 12, height = 8)
+
+rm(Q, p)
+```
+
+
+## Variable selection and preparation
+
+As the unknown respondants are from either *SurveyGp* 2 or 3, responses from the Leaflet group (ID=1) can be removed from assessment. *SurveyGp* 4 (the target for classification) will be retained for classification analysis.
+
+A selection of feature variables, considered to present the greatest potential to establish dissimilarity between groups, will be chosen. The aim is to eliminate feature variables that are either not thought to provide information that discriminate between Survey Group or may be autocorrelated with other variables. Feature variables used comprise:
+
+* *MinsCycling*, *MinsWalking*, *MinsCar*.
+* *HH_carvan*.
+* *Total_walk*, *Total_cyc*, *Total_mcyc*, *Total_PT*, *Total_taxi*, *Total_car* .
+* *HH_income*.
+* *Emp_FTwork_reas*, *Emp_PTwork_reas*, *Emp_PTstud_reas*, *Emp_looking_reas*, *Emp_notlkg_reas*, *Emp_retired_reas*, *Emp_volwork_reas*, *Emp_home_reas*.
+* *Prefcyc*, *Prefbus*, *Preftrain*, *Preftube*, *Prefwalk*, *Prefcar*, *Prefwalk*
+* *Area_cyc_unsafe*, *Area_cross*, *Area_talk*, *Area_8yo_walk*, *Area_stop*, *Area_crime*, *Area_cyc_path*, *Area_walk_pleas*, *Area_shade*, *Area_airpoll*, *Area_cyc_pleas*, *Area_8yo_cyc*, *Area_facilities*, *Area_walk_unsafe*, *Area_pavements*
+
+```{r Select_variables, include=FALSE, eval=TRUE}
+# Temp dataset
+ppv.tmp <- ppv
+
+# Create df of feature variables
+cdf <- ppv.tmp %>%
+  select(ID, SurveyGp, MinsCycling, MinsWalking, MinsCar, HH_carvan, Total_walk, Total_cyc, Total_mcyc, Total_PT, Total_taxi, Total_car, HH_income, Emp_FTwork_reas, Emp_PTwork_reas, Emp_PTstud_reas, Emp_looking_reas, Emp_notlkg_reas, Emp_retired_reas, Emp_volwork_reas, Emp_home_reas, Prefcyc, Prefbus, Preftrain, Preftube, Prefcar, Prefwalk, Area_cyc_unsafe, Area_cross, Area_talk, Area_8yo_walk, Area_stop, Area_crime, Area_cyc_path, Area_walk_pleas, Area_shade, Area_airpoll, Area_cyc_pleas, Area_8yo_cyc, Area_facilities, Area_walk_unsafe, Area_pavements)
+
+```
+
+```{r Remove_Leaflet_and_Unknown, include=FALSE, eval=TRUE}
+## Remove Leaflet group (ID=1) and unknown group ID 4
+cdf <- cdf %>%
+  filter(SurveyGp %in% c(2,3,4))
+```
+
+```{r SurveyGp_to_Factor, include=FALSE, eval=TRUE}
+# Survey Group target variable converted to Factor for later analysis R.
+cdf <- cdf %>%
+  mutate(SurveyGp = as.factor(SurveyGp))
+```
+
+Some other data preparation taks are required:
+
+* Assement of outliers.
+* Manipulating some feature variables to make them acceptable for Support Vector Machine (SVM) classification analysis.
+* Missing values coded as -99 need to be recoded as 0 (zero).
+
+
+### Assement of outliers
+
+```{r Check_outliers, include=FALSE, eval=FALSE}
+cdf %>%
+  filter(ID %in% c(1723, 4638, 4685, 4500, 5107))
+```
+During earlier data cleaning, response IDs 1723, 4638, 4685, 4500, and 5107 possess erroneous entries for *MinsCycling*, *MinsWalking*, *MinsCar* variables. Only ID 1723 is present in any of *SurveyGp* 2, 3 or 4. The erroneous *MinsCycling* entry in this response will be replaced with a value of 60 mins to represent some cycling activity for this response, ensuring that it can contribute to the clustering analysis.
+```{r Remove_ID1723, include=FALSE, eval=TRUE}
+cdf <- cdf %>%
+  mutate(MinsCycling = ifelse(ID==1723, 60, MinsCycling))
+```
+
+Response ID 2807 is member of *SurveyGp* 4 and possesses a *HH_carvan* value of 10. This is likely to be an erroneous outlier given that *HH_number* for this record is 1 and the next largest *HH_carvan* values are 5. It could be that a keystroke error (entering 10 rather than 1) by respondant ID 2807 is the reason for this. *HH_carvan* for ID 2807 will be changed from 10 to 1 for the purposes of classification analysis in order to prevent this entry from unduly interfering with class assignment.
+```{r HH_carvan_error, include=FALSE, eval=TRUE}
+cdf <- cdf %>%
+  mutate(HH_carvan = ifelse(HH_carvan==10, 1, HH_carvan))
+```
+
+
+### *Pref* variables
+
+*Pref...* feature variables are categorical data. In some sense they have an ordinal quality where the respondant's bias for a particular mode is ranked in the answer options provided. However, on closer inspection this ranking is not absolutely clear (Table 3 below). For instance, although value labels 1 and 5 can be considered opposing ends of a spectrum, the labels for values 2, 3 and 4 are not as clear-cut in their order and the 'distance' between them. 
+
+**Table**: Values and value labels of *Pref...* feature variables.
+
+| Value | Value label |
+|:------|:------------|
+| 1 | I use this and it is my preferred method of travel |
+| 2 | This is one of several methods |
+| 3 | I am happy to use I use this method but would prefer not to |
+| 4 | I would like to use this method, but currently don't |
+| 5 | I don't use this method and prefer not to |
+
+
+To address this issue, *Pref...* feature variables will be recoded as dummy variables [@kuhn:2013ab]. This means drawing out value labels within each *Pref...* variable as its own binary variable. To avoid perfect co-linearity (dummy variable trap), one less dummy variable will be created than the number of value labels present. For example, for *Prefcyc*, create four new variables, one for each *Prefcyc* value label option (*Prefcyc.1*, *Prefcyc.2*, *Prefcyc.3*, *Prefcyc.4*) and code each as 1 or 0, where 1 represents the value being present and 0 represents the value being absent. The fourth dummy variable (*Prefcyc.4*) represents both value labels 4 and 5, with a 1 representing a value label 4 response and 0 representing a value label 5 response.
+
+```{r Dummify_Pref, include=FALSE, eval=TRUE}
+# Select *Pref...* and substitute 
+pref <- cdf %>%
+  select(starts_with("Pref"))
+
+pref[] <- lapply(pref, factor)
+
+str(pref)
+
+dmy <- dummyVars(~., data = pref, fullRank = TRUE)
+trsf <- data.frame(predict(dmy, newdata = pref))
+```
+
+```{r Pref_checks, include=FALSE, eval=FALSE}
+View(trsf)
+str(trsf)
+
+# Check
+## Prefcar.2=1 > Prefcar=2, Prefcar.2=0 > Prefcar=1
+cdf %>%
+  select(ID, Prefcar) %>%
+  cbind(trsf$Prefcar.2) %>%
+  filter(Prefcar %in% c(1,2)) %>%
+  View()
+
+cdf %>%
+  select(ID, Prefcyc) %>%
+  cbind(trsf$Prefcyc.2,  trsf$Prefcyc.3, trsf$Prefcyc.4, trsf$Prefcyc.5) %>%
+  View()
+
+rm(cdf.v, pref, trsf, dmy)
+```
+
+```{r Combine_Pref_dataset, include=FALSE, eval=TRUE}
+cdf <- cdf %>%
+  select(everything(), -starts_with("Pref")) %>%
+  cbind(trsf)
+
+rm(pref, trsf, dmy)
+```
+
+
+### *Area* variables
+*Area* variables are categorical data that possess an order from which some understanding of distance can be developed. That is, responses expressing agreement are numerically distance from responses expressing disagreement. However the value numbering for *Area* variables does not conform perfectly to this idea of distance. Value 1 ('Strongly disagree') is distant from value 4 ('Strongly agree'), but value 5 is 'Neither agree nor Disagree'. Value 5 should lie between values 'Strongly disagree' and 'Strongly agree' to adhere to   To construct variables with an inherant sense of distance, current value 5 therefore needs to be recoded to 3, current vaule 3 recoded to 4, and current value 4 recoded to 5. Additionally, *Area* variables need to have value=8 ('Refused to answer') changed to NA.
+
+
+```{r Recode_Area, include=FALSE, eval=TRUE}
+
+# Gather *Area* variables and re-assign values to produce ordinal variables
+cdf.area <- ppv.tmp %>%
+  filter(SurveyGp %in% c(2,3,4)) %>%
+  select(ID, Area_cyc_unsafe, Area_cross, Area_talk, Area_8yo_walk, Area_stop, Area_crime, Area_cyc_path, Area_walk_pleas, Area_shade, Area_airpoll, Area_cyc_pleas, Area_8yo_cyc, Area_facilities, Area_walk_unsafe, Area_pavements) %>%
+  gather(variable, value, -ID) %>%
+  mutate(value = ifelse(value==5, 0, value)) %>%
+  mutate(value = ifelse(value==4, 5, value)) %>%
+  mutate(value = ifelse(value==3, 4, value)) %>%
+  mutate(value = ifelse(value==0, 3, value)) %>%
+  mutate(value = ifelse(value==8, NA, value))
+
+# Sprad back to columns
+cdf.area.w <- spread(cdf.area, variable, value)
+
+# cdf minus *Area* variables
+cdf.v <- cdf %>%
+  select(-starts_with("Area"))
+
+# Add new re-assigned *Area* variables
+cdf.v <- cdf.area.w %>%
+  inner_join(cdf.v, "ID")
+
+str(cdf.v)
+
+# Check reassignment
+# cdf.v %>%
+#   inner_join(cdf, "ID") %>%
+#   select(ID, Area_cyc_unsafe.x, Area_cyc_unsafe.y) %>%
+#   filter(Area_cyc_unsafe.y==4) %>%
+#   View()
+
+# Set changes
+cdf <- cdf.v
+
+rm(cdf.v, cdf.area, cdf.area.w, ppv.tmp)
+
+```
+
+### Missing values
+
+The SVM classification algorithm cannot accept missing values. Any missing values (represented as -99 or NA in the analysis dataset) will be recoded to 0. There are no NAs in *MinsCycling*, *MinsWalking*, or *MinsCar*, *HH_carvan* and *Emp...* variables do have NAs. *Emp...* and *HH_income* variables also have -99 entries that need to be changed to 0. *Total...* variables contain some NAs.
+
+```{r Replace_missing, include=FALSE, eval=TRUE}
+# Temp dataset
+cdf.v <- cdf
+
+# Replace -99 and NA with 0
+cdf.v <- cdf.v %>%
+  gather(vars, val, -ID, -SurveyGp) %>%
+  mutate(val = ifelse(val==-99, 0, val)) %>%
+  mutate(val = ifelse(is.na(val), 0, val)) %>%
+  spread(vars, val)
+```
+
+
+```{r Check_replace_missing, include=FALSE, eval=FALSE}
+# Check Feature Variables for NAs
+cdf.v %>%
+  # select(ID, Total_walk, Total_cyc, Total_mcyc, Total_PT, Total_taxi, Total_car) %>%
+  gather(feature_var, value, -ID) %>%
+  filter(is.na(value))
+
+# Spot check on ID matching 
+cdf %>%
+  select(ID, MinsCycling, Prefcyc.2) %>%
+  inner_join(cdf.v[,c("ID", "MinsCycling", "Prefcyc.2")], "ID") %>%
+  View()
+```
+
+```{r Set_replace_missing, include=FALSE, eval=TRUE}
+# Set changes
+cdf <- cdf.v
+rm(cdf.v)
+```
+
+
+```{r Save classification data, include=FALSE, eval=FALSE}
+# Save data
+setwd("~/Documents/Personal/Work/DataScience/PeopleAndPlaces/Working/Classification")
+save(list=ls(), file="./Data/pp.class.RData")
+
+# Save core data
+# save(list = c("pp", "ppv","cdf"), file = "../Data/Archive/pp.class.base_[date].RData")
+
+```
+
+## References
+
