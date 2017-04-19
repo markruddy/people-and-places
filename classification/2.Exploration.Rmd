@@ -1,0 +1,158 @@
+---
+title: "Exploration"
+author: "Mark Ruddy"
+date: "August 20, 2016"
+output: html_document
+---
+
+```{r Load libraries, echo=FALSE, warning=FALSE, message=FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(knitr)
+library(devtools)
+# install_github("markruddy/ggbiplot")
+library(ggbiplot)
+library(xts)
+library(chron)
+
+setwd("~/Documents/Personal/Work/DataScience/PeopleAndPlaces/Working")
+load("./Data/pp.class.base.RData")
+setwd("~/Documents/Personal/Work/DataScience/PeopleAndPlaces/Working/Exploration")
+
+# Source from local git repository
+# source("/Users/markruddy/Documents/git/ggbiplot/R/ggbiplot.r")
+```
+
+
+## Principal Component Ananlysis
+
+```{r Rename_factors}
+cdf.23 <- cdf %>%
+  filter(SurveyGp!=4) %>%
+  mutate(SurveyGp = ifelse(SurveyGp==2,"Oyster","Cycle"))
+```
+
+
+### All variables
+```{r PCA_all, include=TRUE}
+# Using all variables
+cdf.23.pca <- prcomp(cdf.23[, -1:-2], scale=TRUE)
+```
+
+
+```{r PCA_all_plot}
+ggbiplot(cdf.23.pca, obs.scale = 1, var.scale = 1,
+  groups = cdf.23[,2], ellipse = TRUE, circle = FALSE, var.axes = FALSE) +
+  theme(legend.direction = 'vertical', legend.position = 'right') +
+  labs(title = "1st two PCA axes for all feature variables")
+```
+
+
+### Area variables
+```{r PCA_area}
+# Using limited variable list
+cdf.23.area <- cdf.23 %>%
+  select(starts_with("Area"))
+
+cdf.23.area.pca <- prcomp(cdf.23.area[, -1:-2], scale=TRUE)
+```
+
+```{r PCA_area_plot}
+ggbiplot(cdf.23.area.pca, obs.scale = 1, var.scale = 1,
+  groups = cdf.23[,2], ellipse = TRUE, circle = FALSE, var.axes = TRUE) +
+  theme(legend.direction = 'vertical', legend.position = 'right') +
+  labs(title = "1st two PCA axes for 'Area' feature variables")
+```
+
+
+### Emp variables
+```{r PCA_emp}
+# Using limited variable list
+cdf.23.emp <- cdf.23 %>%
+  select(starts_with("Emp"), HH_income)
+
+cdf.23.emp.pca <- prcomp(cdf.23.emp[, -1:-2], scale=TRUE)
+```
+
+```{r PCA_emp_plot}
+ggbiplot(cdf.23.emp.pca, obs.scale = 1, var.scale = 1,
+  groups = cdf.23[,2], ellipse = TRUE, circle = FALSE, var.axes = TRUE) +
+  theme(legend.direction = 'vertical', legend.position = 'right') +
+  labs(title = "1st two PCA axes for 'Emp' feature variables")
+
+```
+
+
+
+### Pref variables
+```{r PCA_pref}
+# Using limited variable list
+cdf.23.pref <- cdf.23 %>%
+  select(starts_with("Pref"))
+
+cdf.23.pref.pca <- prcomp(cdf.23.pref[, -1:-2], scale=TRUE)
+```
+
+```{r PCA_pref_plot}
+ggbiplot(cdf.23.pref.pca, obs.scale = 1, var.scale = 1,
+  groups = cdf.23[,2], ellipse = TRUE, circle = FALSE, var.axes = TRUE) +
+  theme(legend.direction = 'vertical', legend.position = 'right') +
+  labs(title = "1st two PCA axes for 'Pref' feature variables")
+```
+
+
+
+### Travel variables
+```{r PCA_trav}
+# Using limited variable list
+cdf.23.trav <- cdf.23 %>%
+  select(MinsCycling, MinsWalking, MinsCar, HH_carvan, Total_walk, Total_cyc, Total_mcyc, Total_PT, Total_taxi, Total_car)
+
+cdf.23.trav.pca <- prcomp(cdf.23.trav[, -1:-2], scale=TRUE)
+```
+
+```{r PCA_trav_plot}
+ggbiplot(cdf.23.trav.pca, obs.scale = 1, var.scale = 1,
+  groups = cdf.23[,2], ellipse = TRUE, circle = FALSE, var.axes = TRUE, alpha=0.5) +
+  theme(legend.direction = 'vertical', legend.position = 'right') +
+  labs(title = "1st two PCA axes for travel-related feature variables")
+```
+
+
+```{r Clean}
+rm(list=ls(pattern="cdf.23"))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
